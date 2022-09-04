@@ -43,11 +43,14 @@ def _run_external_filter(cmd_list, itext):
             cmd_list, 
             capture_output=True, 
             text=True, input=itext)
+
+    result.check_returncode()
     return result.stdout
 
 def _run_external(cmd_list):
     """Given an argv array, run a command, return output."""
     result = subprocess.run( cmd_list, capture_output=False )
+    result.check_returncode()
     return result.stdout
 
 def _pandoc(content, ipd, opd):

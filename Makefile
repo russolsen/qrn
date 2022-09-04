@@ -13,6 +13,9 @@ build:
 serve:
 	$(PYTHON) -m http.server --directory $(DST_DIR) $(PORT)
 
+install-local:
+	$(PYTHON) -m pip install -e .
+
 clean-styles:
 	rm -rf $(DST_DIR)/stylesheets
 

@@ -3,6 +3,7 @@ import os
 import os.path
 from functools import reduce, partial
 import qrn.utils as utils
+from qrn.relative_path import RelativePath
 from qrn.utils import pp
 from qrn.template import Template
 import qrn.converters as converters
@@ -14,11 +15,9 @@ CachedTemplate = utils.memoize(Template.from_file)
 class Site:
     """Overall configuration for the static site."""
 
-    def __init__(self, title, url, src_dir, dst_dir, category_idx={}):
+    def __init__(self, title, url, category_idx={}):
         self.title = title
         self.url = url
-        self.src_dir = src_dir
-        self.dst_dir = dst_dir
         self.set_category_idx(category_idx)
 
     def set_category_idx(self, idx):
@@ -40,26 +39,27 @@ class Site:
 class SourceFile:
     """A generic source file."""
 
-    def __init__(self, site, ipath, ofmt=None):
+    def __init__(self, site, root, path, out_root):
+        print(f"in path: {root} {path}")
         self.site = site
-        self.ipath = ipath
-        [d, n, s] = utils.split_path(ipath)
-        self.path_dir = d
-        self.name = n
-        self.fmt = s
-        self.ofmt = ofmt or s
-        log(f'SourceFile init: {self.path_dir} {self.name} {self.fmt}')
+        self.in_path = RelativePath.from_path(root, path)
+        self.out_path = self.compute_out_path(out_root)
+        log(f'SourceFile init: {self.in_path}')
         self.categories = None
 
+    def compute_out_path(self, out_root):
+        return self.in_path.modify(root=out_root)
+
     def outdated(self):
-        ipath = self.full_ipath()
-        opath = self.full_opath()
+        ipath = self.in_path.full_path()
+        opath = self.out_path.full_path()
         return utils.outdated(ipath, opath)
 
     def process(self):
         if self.outdated():
             print(f"processing {self}")
             self.do_process()
+        return self
 
     def do_process(self):
         raise Exception('Not implemented')
@@ -68,18 +68,13 @@ class SourceFile:
         raise Exception('Not implemented')
 
     def full_ipath(self):
-        return f'{self.site.src_dir}/{self.ipath}'
+        return self.in_path.full_path()
 
     def full_opath(self):
-        result = f'{self.site.dst_dir}/{self.opath()}'
-        return result
-
-    def opath(self):
-        result = f'/{self.path_dir}/{self.name}.{self.ofmt}'
-        return result
+        return self.out_path.full_path()
 
     def __repr__(self):
-        return f'{type(self).__name__}: ({self.path_dir} {self.name} {self.fmt})'
+        return f'{type(self).__name__}: ({self.in_path} -> {self.out_path})'
 
 class Asset(SourceFile):
     """An asset, a file that just gets copied to the target site."""
@@ -88,13 +83,15 @@ class Asset(SourceFile):
         site = self.site
         ipath = self.full_ipath()
         opath = self.full_opath()
+        print(f'full ipath {ipath}')
+        print(f'full opath {opath}')
         converters.copy_file(ipath, opath)
 
 class SassFile(SourceFile):
     """A sass or scss file. Plain CSS files are just assets"""
 
-    def __init__(self, site, ipath):
-        super().__init__(site, ipath, 'css')
+    def compute_out_path(self, out_root):
+        return self.in_path.modify(root=out_root, suffix='css')
 
     def do_process(self):
         site = self.site
@@ -102,31 +99,23 @@ class SassFile(SourceFile):
         opath = self.full_opath()
         converters.copy_sass_to_css(ipath, opath)
 
-
 class Page(SourceFile):
-    """A page, more or less assumed to be in markdown format."""
+    """A asset that can be transformed into html."""
 
-    def __init__(self, site, ipath):
-        super().__init__(site, ipath, 'html')
-        log('Reading', self.site.src_dir,  self.full_ipath())
+    def __init__(self, site, root, path, out_root):
+        super().__init__(site, root, path, out_root)
+        log('New page', )
         self.attrs = utils.read_header(self.full_ipath())
         for a in self.attrs:
             setattr(self, a, self.attrs[a])
-        if 'tags' in self.attrs:
-            self.attrs['tags'] = self.attrs['tags'].split()
-        else:
-            self.attrs['tags'] = []
+        print(self.attrs, type(self.attrs))
+        categories = self.attrs.get('categories', [])
+        if isinstance(categories, str):
+            categories = categories.split()
+        self.categories = categories
  
-    def do_process(self):
-        self._read()
-        self._expand()
-        self._to_html()
-        self._layout()
-        self._write()
-        return self
-
-    def _to_html(self):
-        self.content = converters.md_to_html(self.content)
+    def compute_out_path(self, out_root):
+        return self.in_path.modify(root=out_root, suffix='html')
 
     def _read(self):
         path = self.full_ipath()
@@ -136,24 +125,21 @@ class Page(SourceFile):
 
     def _write(self):
         path = self.full_opath()
-        log('Writing', self.name, path)
+        log('Writing', self)
         with open(path, 'w') as f:
             f.write(self.content)
         return self
 
-    def categories(self):
-        return self.attrs['tags']
-
     def _expand(self):
-        log("Expand page", self.name)
-        p_template = Template(self.content, self.name)
+        log("Expand page", self)
+        p_template = Template(self.content, self.in_path.name)
         output = self.render_template(p_template)
         self.content = output
         return self
     
     def _layout(self):
-        log("Layout self", self.name)
-        path = f'{self.site.src_dir}/{self.layout}'
+        log("Layout self", self)
+        path = f'layouts/{self.layout}'
         template = CachedTemplate(path, self.layout)
         output = self.render_template(template)
         self.content = output
@@ -161,7 +147,7 @@ class Page(SourceFile):
 
     def render_partial(self, partial_path):
         log('Render partial', partial_path)
-        path = f'{self.site.src_dir}/{partial_path}'
+        path = f'layouts/{partial_path}'
         partial_template = CachedTemplate(path, partial_path)
         output = partial_template.render(globals(), locals())
         return output
@@ -173,16 +159,12 @@ class Page(SourceFile):
         n = min(len(ary), n)
         return ary[:n]
 
-    def link_to(self, *args):
-        return f'Link to: {args}'
-
     def link_to_page(self, page, fmt='html'):
-        #log("link to page", page)
-        url = page.opath()
+        url = "/" + page.out_path.path()
         if fmt == 'html':
-            return htapi.ATx(url, page.title).encode()
+            return htapi.ATx(url, page.title.title()).encode()
         else:
-            return f'[{title}]({url})'
+            return f'[{page.title.title()}]({url})'
 
     def image_tag(self, url):
         return htapi.Img(url).encode()
@@ -199,7 +181,32 @@ class Page(SourceFile):
     def render_template(self, t):
         return t.render(globals(), locals())
 
-def scan_files(directory, pats, exclusions=[]):
+
+class MarkdownPage(Page):
+    """A page more or less assumed to be in markdown format."""
+ 
+    def do_process(self):
+        self._read()
+        self._expand()
+        self._to_html()
+        self._layout()
+        self._write()
+        return self
+
+    def _to_html(self):
+        self.content = converters.md_to_html(self.content)
+
+class TemplatedHtml(Page):
+    """An HTML file that needs to be run thru the template filter."""
+ 
+    def do_process(self):
+        self._read()
+        self._expand()
+        self._layout()
+        self._write()
+        return self
+
+def scan(directory, pats, exclusions=[], include_dirs=False):
     """Python version of the find command."""
 
     log('Scan files', directory, pats)
@@ -213,8 +220,9 @@ def scan_files(directory, pats, exclusions=[]):
         if utils.globs(exclusions, p):
             continue
         result.append(p)
-
-    result = filter(partial(utils.is_file, directory), result)
+    
+    if not include_dirs:
+        result = filter(partial(utils.is_file, directory), result)
     return result
 
 def sort_by_date(pages, reverse=True):
@@ -229,6 +237,7 @@ def tap(desc, page):
 
 def index_categories(idx, page):
     categories = page.categories
+    log(f'Index categories: page {page} cates: {page.categories}')
     if categories:
         for c in categories:
             page_list = idx.get(c, [])
@@ -237,7 +246,7 @@ def index_categories(idx, page):
     return idx
 
 def build_category_index(files):
-    log('Building category index')
+    log('Building category index', files)
     idx = reduce(index_categories, files, {})
     for c in idx:
         cpages = idx[c]
@@ -245,25 +254,27 @@ def build_category_index(files):
         idx[c] = cpages
     return idx
 
-def sourcefile_for(site, path):
+def sourcefile_for(site, in_root, path, out_root):
     """Return an appropriate SourceFile instance for the path."""
     suffix = utils.get_suffix(path)
+
     if suffix == 'md':
-        return Page(site, path)
+        return MarkdownPage(site, in_root, path, out_root)
+    if suffix == 'thtml':
+        return TemplatedHtml(site, in_root, path, out_root)
     if (suffix == 'sass') or (suffix == 'scss'):
-        return SassFile(site, path)
-    return Asset(site, path)
+        return SassFile(site, in_root, path, out_root)
+    return Asset(site, in_root, path, out_root)
 
-#def process(site, path):
-#    sourcefile_forped = wrap(site, path)
-#    return sourcefile_forped.process()
-
-def process_static_files(site, paths):
+def process_static_files(site, in_dir, out_dir, paths):
     """Takes a list of src paths and builds the appropriate assets."""
 
     # Turn all the paths into Files
-    files = utils.doall(partial(sourcefile_for, site), paths)
+    files = utils.doall(
+            lambda p: sourcefile_for(site, in_dir, p, out_dir),
+            paths)
 
+    utils.pp(files)
     # Build the category index for all the files. We
     # need the index when we do the page processing.
 
@@ -274,9 +285,10 @@ def process_static_files(site, paths):
 
     return utils.doall(lambda f: f.process(), files)
 
-def process_dynamic_file(xform_f, site, path, items):
+
+def process_dynamic_files(xform_f, site, page, items):
     """Generate dynamic pages, pased on path, one for each item."""
     for i in items:
-        page = sourcefile_for(site, path)
+        print(f'Index: {i}')
         page = xform_f(i, page)
         page.process()

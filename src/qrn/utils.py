@@ -90,8 +90,10 @@ def globs(globs, fn):
             return True
     return False
 
-def mk_dirs(*dirs):
-    for d in dirs:
+def mk_dirs(directory, *paths):
+    os.makedirs(directory, exist_ok=True)
+    for path in paths:
+        d = f'{directory}/{path}'
         log("Making dir", d)
         os.makedirs(d, exist_ok=True)
 

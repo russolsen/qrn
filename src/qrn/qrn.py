@@ -8,7 +8,7 @@ from qrn.utils import pp
 from qrn.template import Template
 import qrn.converters as converters
 import qrn.htapi as htapi
-from qrn.log import *
+import logging
 
 CachedTemplate = utils.memoize(Template.from_file)
 
@@ -29,7 +29,6 @@ class Site:
         return self._category_idx
 
     def pages_for_category(self, c, max_n=0):
-        #log("Pages for category", c)
         pages = self._category_idx[c]
         pages.sort(key=lambda p: p.title)
         if max_n > 0:
@@ -40,11 +39,10 @@ class SourceFile:
     """A generic source file."""
 
     def __init__(self, site, root, path, out_root):
-        print(f"in path: {root} {path}")
         self.site = site
         self.in_path = RelativePath.from_path(root, path)
         self.out_path = self.compute_out_path(out_root)
-        log(f'SourceFile init: {self.in_path}')
+        logging.info(f'SourceFile init: %s', self.in_path)
         self.categories = None
 
     def compute_out_path(self, out_root):
@@ -57,7 +55,6 @@ class SourceFile:
 
     def process(self):
         if self.outdated():
-            print(f"processing {self}")
             self.do_process()
         return self
 
@@ -83,8 +80,6 @@ class Asset(SourceFile):
         site = self.site
         ipath = self.full_ipath()
         opath = self.full_opath()
-        print(f'full ipath {ipath}')
-        print(f'full opath {opath}')
         converters.copy_file(ipath, opath)
 
 class SassFile(SourceFile):
@@ -104,11 +99,9 @@ class Page(SourceFile):
 
     def __init__(self, site, root, path, out_root):
         super().__init__(site, root, path, out_root)
-        log('New page', )
         self.attrs = utils.read_header(self.full_ipath())
         for a in self.attrs:
             setattr(self, a, self.attrs[a])
-        print(self.attrs, type(self.attrs))
         categories = self.attrs.get('categories', [])
         if isinstance(categories, str):
             categories = categories.split()
@@ -119,26 +112,26 @@ class Page(SourceFile):
 
     def _read(self):
         path = self.full_ipath()
-        log('Reading body', path)
+        logging.debug('Reading body %s', path)
         self.content = utils.read_body(path)
         return self
 
     def _write(self):
         path = self.full_opath()
-        log('Writing', self)
+        logging.info('Writing %s', self)
         with open(path, 'w') as f:
             f.write(self.content)
         return self
 
     def _expand(self):
-        log("Expand page", self)
+        logging.debug("Expand page %s", self)
         p_template = Template(self.content, self.in_path.name)
         output = self.render_template(p_template)
         self.content = output
         return self
     
     def _layout(self):
-        log("Layout self", self)
+        logging.debug("Layout self %s", self)
         path = f'layouts/{self.layout}'
         template = CachedTemplate(path, self.layout)
         output = self.render_template(template)
@@ -146,7 +139,7 @@ class Page(SourceFile):
         return self
 
     def render_partial(self, partial_path):
-        log('Render partial', partial_path)
+        logging.debug('Render partial %s', partial_path)
         path = f'layouts/{partial_path}'
         partial_template = CachedTemplate(path, partial_path)
         output = partial_template.render(globals(), locals())
@@ -206,10 +199,14 @@ class TemplatedHtml(Page):
         self._write()
         return self
 
+def init_logging(path='log_site.txt', level=logging.INFO, filemode='w'):
+    fmt='%(asctime)s %(levelname)s: %(message)s'
+    logging.basicConfig(filename=path, level=level, format=fmt, filemode=filemode)
+
 def scan(directory, pats, exclusions=[], include_dirs=False):
     """Python version of the find command."""
 
-    log('Scan files', directory, pats)
+    logging.info('Scan files dir: %s pats %s', directory, pats)
     paths = set()
     for g in pats:
         these_paths = utils.xglob(directory, g)
@@ -237,7 +234,7 @@ def tap(desc, page):
 
 def index_categories(idx, page):
     categories = page.categories
-    log(f'Index categories: page {page} cates: {page.categories}')
+    logging.debug(f'Index categories: page %s cates: %s', page, page.categories)
     if categories:
         for c in categories:
             page_list = idx.get(c, [])
@@ -246,7 +243,7 @@ def index_categories(idx, page):
     return idx
 
 def build_category_index(files):
-    log('Building category index', files)
+    logging.info('Building category index %s', files)
     idx = reduce(index_categories, files, {})
     for c in idx:
         cpages = idx[c]
@@ -257,7 +254,6 @@ def build_category_index(files):
 def sourcefile_for(site, in_root, path, out_root):
     """Return an appropriate SourceFile instance for the path."""
     suffix = utils.get_suffix(path)
-
     if suffix == 'md':
         return MarkdownPage(site, in_root, path, out_root)
     if suffix == 'thtml':
@@ -274,7 +270,6 @@ def process_static_files(site, in_dir, out_dir, paths):
             lambda p: sourcefile_for(site, in_dir, p, out_dir),
             paths)
 
-    utils.pp(files)
     # Build the category index for all the files. We
     # need the index when we do the page processing.
 
@@ -289,6 +284,6 @@ def process_static_files(site, in_dir, out_dir, paths):
 def process_dynamic_files(xform_f, site, page, items):
     """Generate dynamic pages, pased on path, one for each item."""
     for i in items:
-        print(f'Index: {i}')
+        logging.info(f'Index: %s', i)
         page = xform_f(i, page)
         page.process()

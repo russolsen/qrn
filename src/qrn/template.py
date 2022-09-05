@@ -3,7 +3,7 @@ import sys
 from io import StringIO
 from contextlib import redirect_stdout
 import qrn.utils as utils
-from qrn.log import log
+import logging
 
 SplitRE = r'(?=<%)|=%>\n?|!%>\n?|%>'
 
@@ -25,7 +25,7 @@ class Template:
         return cls(content, desc)
 
     def clear(self):
-        self.output = 'log("Here we go")\n'
+        self.output = 'logging.debug("Running generated code.")\n'
 
     def write(self, value):
         self.output += str(value)
@@ -68,6 +68,7 @@ class Template:
     def compile(self):
         self.clear()
         self.emit_body()
+        utils.log_code(self.output)
         self.compiled = utils.compile_string(self.output, self.desc)
 
     def render(self, glob, loc={}):

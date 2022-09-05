@@ -2,8 +2,8 @@ import subprocess
 import shutil
 import os
 import os.path
+import logging
 import qrn.utils as utils
-from qrn.log import log
 
 # This file is the interface to the major non-python
 # dependencies used by doctrine. They are program
@@ -12,15 +12,15 @@ from qrn.log import log
 
 def copy_file(ipath, opath):
     """Copy a file, unchanged."""
-    log('Copying', ipath, opath)
+    logging.info('Copying %s => %s', ipath, opath)
     shutil.copyfile(ipath, opath)
     return opath
 
 def mk_dir(opath):
     """Create a directory if it doesn't already exist."""
-    log(f'Creating dir', opath)
+    logging.info(f'Creating dir %s', opath)
     if os.path.exists(opath):
-        log('Directory exists')
+        logging.info('Directory exists')
         return
     os.mkdir(opath)
 
@@ -32,7 +32,7 @@ def md_to_html(content):
 def copy_sass_to_css(ipath, opath):
     """Convert a scss/sass file to a css file."""
     opath = utils.change_suffix(opath, 'css')
-    log('Sass conversion:', ipath, opath)
+    logging.info('Sass conversion: %s => %s', ipath, opath)
     cmd_list = ['sass', ipath, opath]
     _run_external(cmd_list)
     return 

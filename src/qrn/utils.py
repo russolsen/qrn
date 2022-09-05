@@ -7,10 +7,9 @@ import os.path
 import yaml
 import pprint
 import subprocess
+import logging
 from io import StringIO
 from contextlib import redirect_stdout
-
-from qrn.log import log
 
 PPrinter = pprint.PrettyPrinter(indent=4)
 pp = PPrinter.pprint
@@ -18,7 +17,7 @@ pp = PPrinter.pprint
 MarkerRE = r'^--- *$'
 
 def read_file(path):
-    log(f"Read file: {path}")
+    logging.debug(f'Read file: %s', path)
     result = None
     with open(path) as f:
         result = f.read()
@@ -94,14 +93,13 @@ def mk_dirs(directory, *paths):
     os.makedirs(directory, exist_ok=True)
     for path in paths:
         d = f'{directory}/{path}'
-        log("Making dir", d)
+        logging.info('Making dir %s', d)
         os.makedirs(d, exist_ok=True)
 
 def outdated(src_path, dst_path):
     try:
         src_mod = os.path.getmtime(src_path)
         dst_mod = os.path.getmtime(dst_path)
-        #print(src_path, dst_path, src_mod, dst_mod)
         return src_mod > dst_mod
     except FileNotFoundError:
         return True
@@ -170,10 +168,10 @@ def memoize(f):
 
 def log_code(code_str):
     """Given code in a string, log it out line by line."""
-    log("---- Code ----")
+    logging.debug('---- Code ----')
     lines = code_str.split('\n')
     for i in range(len(lines)):
-        log(i+1, lines[i])
+        logging.debug('%d: %s', i+1, lines[i])
 
 def compile_string(s, desc):
     return compile(s, desc, "exec")
@@ -185,7 +183,7 @@ def exec_prog_output(compiled, glob={}, loc={}):
         with redirect_stdout(f):
             exec(compiled, glob, loc)
     except Exception as e:
-        log("Error running code", e)
+        logging.warning("Error running code %s", e)
         raise e
     f.seek(0)
     result = f.read()

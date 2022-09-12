@@ -16,13 +16,13 @@ def copy_file(ipath, opath):
     shutil.copyfile(ipath, opath)
     return opath
 
-def mk_dir(opath):
-    """Create a directory if it doesn't already exist."""
-    logging.info(f'Creating dir %s', opath)
-    if os.path.exists(opath):
-        logging.info('Directory exists')
-        return
-    os.mkdir(opath)
+#def mk_dir(opath):
+#    """Create a directory if it doesn't already exist."""
+#    logging.info(f'Creating dir %s', opath)
+#    if os.path.exists(opath):
+#        logging.info('Directory exists')
+#        return
+#    os.mkdir(opath)
 
 def md_to_html(content):
     """Convert markdown to html."""

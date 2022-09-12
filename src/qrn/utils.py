@@ -16,12 +16,18 @@ pp = PPrinter.pprint
 
 MarkerRE = r'^--- *$'
 
-def read_file(path):
+def read_file(path, mode='r'):
     logging.debug(f'Read file: %s', path)
     result = None
-    with open(path) as f:
+    with open(path, mode) as f:
         result = f.read()
     return result
+
+def write_file(contents, path, mode='w'):
+    logging.debug(f'write file: %s', path)
+    result = None
+    with open(path, mode) as f:
+        f.write(contents)
 
 def __read_until_match(f, regex):
     line = f.readline()
@@ -63,6 +69,10 @@ def change_suffix(p, newsuffix):
 def get_suffix(p):
     parts = os.path.splitext(p)
     return parts[1][1:]
+
+def get_filename(p):
+    parts = os.path.split(p)
+    return parts[1]
 
 def remove_suffix(p):
     parts = os.path.splitext(p)
@@ -122,6 +132,13 @@ def assoc(d, *kvs):
         result[kvs[i]] = kvs[i+1]
     return result
 
+def with_keys(d, *ks):
+    result = {}
+    for k in ks:
+        if k in d:
+            result[k] = d[k]
+    return result
+
 def identity(x):
     return x
 
@@ -136,11 +153,24 @@ def compose(*funcs):
     def invoke(arg):
         result = arg
         for f in funcs:
+            #print('invoke, calling', f)
             result = f(result)
         return result
     return invoke
 
+def arrow(x, *funcs):
+    for f in funcs:
+        x = f(x)
+    return x
+
 def doall(f, coll):
+    """Apply f to each element in coll, do not keep results."""
+    for element in coll:
+        #print("do all call fun")
+        f(element)
+        #print("do all DONE call fun")
+
+def emap(f, coll):
     """Like map, but not lazy."""
     return list(map(f, coll))
 
@@ -168,6 +198,7 @@ def memoize(f):
 
 def log_code(code_str):
     """Given code in a string, log it out line by line."""
+    return
     logging.debug('---- Code ----')
     lines = code_str.split('\n')
     for i in range(len(lines)):

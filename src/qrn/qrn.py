@@ -1,203 +1,37 @@
-import sys
-import os
-import os.path
-from functools import reduce, partial
+import logging
+from functools import partial
 import qrn.utils as utils
-from qrn.relative_path import RelativePath
-from qrn.utils import pp
-from qrn.template import Template
 import qrn.converters as converters
 import qrn.htapi as htapi
-import logging
+from qrn.relative_path import RelativePath 
+from qrn.epy import EPyCompiler
+from qrn.paml import PamlCompiler
+from qrn.kv import KV
 
-CachedTemplate = utils.memoize(Template.from_file)
-
-class Site:
-    """Overall configuration for the static site."""
-
-    def __init__(self, title, url, category_idx={}):
-        self.title = title
-        self.url = url
-        self.set_category_idx(category_idx)
-
-    def set_category_idx(self, idx):
-        self._category_idx = idx
-        self.categories = list(idx.keys())
-        self.categories.sort()
-
-    def category_idx(self):
-        return self._category_idx
-
-    def pages_for_category(self, c, max_n=0):
-        pages = self._category_idx[c]
-        pages.sort(key=lambda p: p.title)
-        if max_n > 0:
-            pages = pages[0:max_n]
-        return pages
-
-class SourceFile:
-    """A generic source file."""
-
-    def __init__(self, site, root, path, out_root):
-        self.site = site
-        self.in_path = RelativePath.from_path(root, path)
-        self.out_path = self.compute_out_path(out_root)
-        logging.info(f'SourceFile init: %s', self.in_path)
-        self.categories = None
-
-    def compute_out_path(self, out_root):
-        return self.in_path.modify(root=out_root)
-
-    def outdated(self):
-        ipath = self.in_path.full_path()
-        opath = self.out_path.full_path()
-        return utils.outdated(ipath, opath)
-
-    def process(self):
-        if self.outdated():
-            self.do_process()
-        return self
-
-    def do_process(self):
-        raise Exception('Not implemented')
-
-    def categories(self):
-        raise Exception('Not implemented')
-
-    def full_ipath(self):
-        return self.in_path.full_path()
-
-    def full_opath(self):
-        return self.out_path.full_path()
-
-    def __repr__(self):
-        return f'{type(self).__name__}: ({self.in_path} -> {self.out_path})'
-
-class Asset(SourceFile):
-    """An asset, a file that just gets copied to the target site."""
-
-    def do_process(self):
-        site = self.site
-        ipath = self.full_ipath()
-        opath = self.full_opath()
-        converters.copy_file(ipath, opath)
-
-class SassFile(SourceFile):
-    """A sass or scss file. Plain CSS files are just assets"""
-
-    def compute_out_path(self, out_root):
-        return self.in_path.modify(root=out_root, suffix='css')
-
-    def do_process(self):
-        site = self.site
-        ipath = self.full_ipath()
-        opath = self.full_opath()
-        converters.copy_sass_to_css(ipath, opath)
-
-class Page(SourceFile):
-    """A asset that can be transformed into html."""
-
-    def __init__(self, site, root, path, out_root):
-        super().__init__(site, root, path, out_root)
-        self.attrs = utils.read_header(self.full_ipath())
-        for a in self.attrs:
-            setattr(self, a, self.attrs[a])
-        categories = self.attrs.get('categories', [])
-        if isinstance(categories, str):
-            categories = categories.split()
-        self.categories = categories
+def top_n(ary, n):
+    n = min(len(ary), n)
+    return ary[:n]
+  
+def link_to_page(page, fmt='html'):
+    url = "/" + page.out_path.path()
+    if fmt == 'html':
+        return htapi.ATx(url, page.title.title()).encode()
+    else:
+        return f'[{page.title.title()}]({url})'
+  
+def image_tag(url):
+    return htapi.Img(url).encode()
+  
+def link_with_image(url, img_src):
+    return htapi.AImg(url, img_src).encode()
+  
+def link_to(url, text):
+    return htapi.ATx(url, text).encode()
  
-    def compute_out_path(self, out_root):
-        return self.in_path.modify(root=out_root, suffix='html')
-
-    def _read(self):
-        path = self.full_ipath()
-        logging.debug('Reading body %s', path)
-        self.content = utils.read_body(path)
-        return self
-
-    def _write(self):
-        path = self.full_opath()
-        logging.info('Writing %s', self)
-        with open(path, 'w') as f:
-            f.write(self.content)
-        return self
-
-    def _expand(self):
-        logging.debug("Expand page %s", self)
-        p_template = Template(self.content, self.in_path.name)
-        output = self.render_template(p_template)
-        self.content = output
-        return self
-    
-    def _layout(self):
-        logging.debug("Layout self %s", self)
-        path = f'layouts/{self.layout}'
-        template = CachedTemplate(path, self.layout)
-        output = self.render_template(template)
-        self.content = output
-        return self
-
-    def render_partial(self, partial_path):
-        logging.debug('Render partial %s', partial_path)
-        path = f'layouts/{partial_path}'
-        partial_template = CachedTemplate(path, partial_path)
-        output = partial_template.render(globals(), locals())
-        return output
-
-    def list_categories(self):
-        return self.site.categories
-
-    def top_n(self, ary, n):
-        n = min(len(ary), n)
-        return ary[:n]
-
-    def link_to_page(self, page, fmt='html'):
-        url = "/" + page.out_path.path()
-        if fmt == 'html':
-            return htapi.ATx(url, page.title.title()).encode()
-        else:
-            return f'[{page.title.title()}]({url})'
-
-    def image_tag(self, url):
-        return htapi.Img(url).encode()
-    
-    def link_with_image(self, url, img_src):
-        return htapi.AImg(url, img_src).encode()
-    
-    def link_to(self, url, text):
-        return htapi.ATx(url, text).encode()
-    
-    def render_page(self):
-        return self.content
-
-    def render_template(self, t):
-        return t.render(globals(), locals())
-
-
-class MarkdownPage(Page):
-    """A page more or less assumed to be in markdown format."""
- 
-    def do_process(self):
-        self._read()
-        self._expand()
-        self._to_html()
-        self._layout()
-        self._write()
-        return self
-
-    def _to_html(self):
-        self.content = converters.md_to_html(self.content)
-
-class TemplatedHtml(Page):
-    """An HTML file that needs to be run thru the template filter."""
- 
-    def do_process(self):
-        self._read()
-        self._expand()
-        self._layout()
-        self._write()
-        return self
+def make_site(title, url, root, out_root):
+    site = KV(title=title, url=url, 
+            root=root, out_root=out_root, cate_index={})
+    return site
 
 def init_logging(path='log_site.txt', level=logging.INFO, filemode='w'):
     fmt='%(asctime)s %(levelname)s: %(message)s'
@@ -220,70 +54,227 @@ def scan(directory, pats, exclusions=[], include_dirs=False):
     
     if not include_dirs:
         result = filter(partial(utils.is_file, directory), result)
-    return result
+    return list(result)
 
 def sort_by_date(pages, reverse=True):
     pages.sort(key=(lambda p: p.created_at), reverse=reverse)
     return pages
 
-def tap(desc, page):
-    print(f"\n\nPage: {desc}")
-    print(f"Title: {page.title}")
-    print(f"Text: {page.content[0:100]}")
-    return page
+class Asset:
+    def __init__(self, site, factory, path):
+        self.site = site
+        self.factory = factory
+        self.path = path
+        self.in_path = RelativePath.from_path(site.root, path)
+        self.out_path = RelativePath.from_path(site.out_root, path)
+        self.fmt = utils.get_suffix(path)
+        self.name = utils.get_filename(path)
+        self.categories = []
+        self.attrs ={}
+        self.prepare()
 
-def index_categories(idx, page):
-    categories = page.categories
-    logging.debug(f'Index categories: page %s cates: %s', page, page.categories)
-    if categories:
-        for c in categories:
-            page_list = idx.get(c, [])
-            page_list.append(page)
-            idx[c] = page_list
-    return idx
+    def prepare(self):
+        pass
 
-def build_category_index(files):
-    logging.info('Building category index %s', files)
-    idx = reduce(index_categories, files, {})
-    for c in idx:
-        cpages = idx[c]
-        cpages = sort_by_date(cpages)
-        idx[c] = cpages
-    return idx
+    def process(self):
+        pass
 
-def sourcefile_for(site, in_root, path, out_root):
-    """Return an appropriate SourceFile instance for the path."""
-    suffix = utils.get_suffix(path)
-    if suffix == 'md':
-        return MarkdownPage(site, in_root, path, out_root)
-    if suffix == 'thtml':
-        return TemplatedHtml(site, in_root, path, out_root)
-    if (suffix == 'sass') or (suffix == 'scss'):
-        return SassFile(site, in_root, path, out_root)
-    return Asset(site, in_root, path, out_root)
+    def compute_content(self, locs=None):
+        return "CONTENT"
 
-def process_static_files(site, in_dir, out_dir, paths):
-    """Takes a list of src paths and builds the appropriate assets."""
+    def is_outdated(self):
+        ipath = self.in_path.full_path()
+        opath = self.out_path.full_path()
+        return utils.outdated(ipath, opath)
+    
+    def full_ipath(self):
+        return self.in_path.full_path()
+    
+    def full_opath(self):
+        return self.out_path.full_path()
 
-    # Turn all the paths into Files
-    files = utils.doall(
-            lambda p: sourcefile_for(site, in_dir, p, out_dir),
-            paths)
+    def get_layout(self):
+        return self.attrs.get('layout', None)
 
-    # Build the category index for all the files. We
-    # need the index when we do the page processing.
+    # Anything in self.attrs becomes a field on the object.
+    # Handy because this means that attrs stored in the asset headers
+    # magically become fields on the Asset instance.
+    def __getattr__(self, name):
+        if name in self.attrs:
+            return self.attrs[name]
+        cname = type(self).__name__
+        raise AttributeError(f"'{cname}' object has no attribute '{name}'")
 
-    idx = build_category_index(files)
-    site.set_category_idx(idx)
+    def __repr__(self):
+        return f'{type(self)}: {self.path}'
 
-    # Now do the page processing.
+class TemplatedAsset(Asset):
+    """And asset that had a header is is run thru the EPy templating."""
 
-    return utils.doall(lambda f: f.process(), files)
+    def __init__(self, cclass, site, factory, path):
+        self.compiler_class = cclass
+        super().__init__(site, factory, path)
+
+    def convert(self, content):
+        return content
+
+    def process(self):
+        print("process", self)
+        content = self.compute_content()
+        opath = self.full_opath()
+        utils.write_file(content, opath, "w")
+
+    def compute_content(self, locs=None):
+        # locs contains the local environment, used when we
+        # do template evaluation. We wither start with the
+        # passed in or use the current one. Either
+        # way we make a copy so that we won't pollute the env
+        # of other assets.
+
+        env = locs
+        if env:
+            env = env.copy()
+        else:
+            env = locals()
+            env['page'] = self
+ 
+        # This is the function that is called inside of
+        # the templates to include another asset.
+
+        def include(path):
+            asset = self.factory.asset_for_path(path)
+            my_env = env.copy()
+            my_env['included_page'] = asset
+            text = asset.compute_content(my_env)
+            return text
+
+        # Make sure we have a reference to the current page and
+        # the include function in the env.
+
+        env['include'] = include
+
+        # Compute the evaluated content. Note we use locs in the
+        # epy compilation.
+        ipath = self.full_ipath()
+        content = utils.read_body(ipath)
+        content = self.compiler_class.evaluate(content, self.path, globals(), env)
+        content = self.convert(content)
+
+        # If a layout is speficied, use that.
+
+        if self.get_layout():
+            lo = self.factory.asset_for_path(self.get_layout())
+            env['layout_page'] = lo
+            env['content'] = content
+            content = lo.compute_content(env)
+        return content
+
+class MarkdownAsset(TemplatedAsset):
+    """Markdown page, has a header and does templating, possibly with a layout"""
+
+    def __init__(self, site, factory, path):
+        super().__init__(EPyCompiler, site, factory, path)
+
+    def prepare(self):
+        ipath = self.full_ipath()
+        self.attrs = utils.read_header(ipath)
+        self.out_path = self.out_path.modify(suffix="html")
+
+    def convert(self, content):
+        print("convert content")
+        return converters.md_to_html(content)
+
+class HTMLAsset(TemplatedAsset):
+    """HTML page, has a header and does templating, possibly with a layout"""
+
+    def __init__(self, site, factory, path):
+        super().__init__(EPyCompiler, site, factory, path)
+
+    def prepare(self):
+        ipath = self.full_ipath()
+        self.attrs = utils.read_header(ipath)
+        print("html attrs", self.attrs)
+
+class HAMLAsset(TemplatedAsset):
+    """HAML page, has a header and does templating, possibly with a layout."""
+
+    def __init__(self, site, factory, path):
+        super().__init__(PamlCompiler, site, factory, path)
+
+    def prepare(self):
+        ipath = self.full_ipath()
+        self.attrs = utils.read_header(ipath)
+        self.out_path = self.out_path.modify(suffix="html")
+
+class OtherAsset(Asset):
+    """Generic asset, just gets copied."""
+
+    def process(self):
+        ipath = self.full_ipath()
+        opath = self.full_opath()
+        converters.copy_file(ipath, opath)
+
+class SassAsset(Asset):
+    """SASS/SCSS asset, gets processed by sass."""
+
+    def prepare(self):
+        self.out_path = self.out_path.modify(suffix="css")
+
+    def process(self):
+        ipath = self.full_ipath()
+        opath = self.full_opath()
+        return converters.sass_to_css(ipath, opath)
+
+class AssetFactory:
+    """Maintains a registry of fmts -> asset classes, makes assets from paths."""
+
+    def __init__(self, site, default_asset_class = OtherAsset):
+        self.site = site
+        self.default_asset_class = default_asset_class
+        self.fmt_to_class = {}
+
+    def add_asset_class(self, fmt, clz):
+        self.fmt_to_class[fmt] = clz
+
+    def asset_class_for_fmt(self, fmt):
+        return self.fmt_to_class.get(fmt, self.default_asset_class)
+
+    def asset_for_path(self, path):
+        fmt = utils.get_suffix(path)
+        clz = self.asset_class_for_fmt(fmt)
+        return clz(self.site, self, path)
+
+    def assets_for_paths(self, paths):
+        print('Paths:', paths)
+        return map(self.asset_for_path, paths)
+
+def standard_asset_factory(site):
+    asset_factory = AssetFactory(site)
+    asset_factory.add_asset_class('md', MarkdownAsset)
+    asset_factory.add_asset_class('html', HTMLAsset)
+    asset_factory.add_asset_class('haml', HAMLAsset)
+    asset_factory.add_asset_class('sass', SassAsset)
+    asset_factory.add_asset_class('scss', SassAsset)
+    return asset_factory
 
 
-def process_dynamic_files(xform_f, site, page, items):
-    """Generate dynamic pages, pased on path, one for each item."""
-    for i in items:
-        logging.info(f'Index: %s', i)
-        page = xform_f(i, page)
-        page.process()
+
+###init_logging('log_site.txt', level=logging.DEBUG)
+###
+###site = make_site("Test site", "", "content", "build")
+###
+###asset_factory = AssetFactory(site)
+###asset_factory.add_asset_class('md', MarkdownAsset)
+###asset_factory.add_asset_class('html', HTMLAsset)
+###asset_factory.add_asset_class('sass', SassAsset)
+###asset_factory.add_asset_class('scss', SassAsset)
+###
+###a1 = asset_factory.asset_for_path("test.md")
+###pp(a1)
+###a1.process()
+###print()
+###print()
+###
+###a2 = asset_factory.asset_for_path("test2.html")
+###pp(a2)
+###a2.process()

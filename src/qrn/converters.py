@@ -29,13 +29,13 @@ def md_to_html(content):
     output = _pandoc(content, 'markdown', 'html')
     return output
 
-def copy_sass_to_css(ipath, opath):
+def sass_to_css(ipath, opath):
     """Convert a scss/sass file to a css file."""
     opath = utils.change_suffix(opath, 'css')
     logging.info('Sass conversion: %s => %s', ipath, opath)
     cmd_list = ['sass', ipath, opath]
     _run_external(cmd_list)
-    return 
+    return
 
 def _run_external_filter(cmd_list, itext):
     """Given an argv array and some input, run a command, return output."""

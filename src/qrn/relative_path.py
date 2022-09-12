@@ -1,7 +1,6 @@
 import os.path as path
 import qrn.utils as utils
 
-
 class RelativePath:
     def __init__(self, root, directory, name, suffix):
         self.root = root

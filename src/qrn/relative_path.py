@@ -16,7 +16,7 @@ class RelativePath:
     def path(self):
         return f'{self.dir}/{self.name}.{self.suffix}'
 
-    def modify(self, root=None, directory=None, name=None, suffix=None):
+    def modify(self, root=None, directory=None, name=None, suffix=None, filename=None):
         root = root or self.root
         directory = directory or self.dir
         name = name or self.name

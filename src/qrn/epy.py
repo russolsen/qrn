@@ -50,10 +50,6 @@ class EPyCompiler:
         generator = CodeGenerator()
         self._compile_template(generator)
         #print(f"Compiler result: <<<<{generator.output}>>>>")
-        fn = f'{random.randint(1,100)}.txt'
-        f = open(fn, "w")
-        f.write(generator.output)
-        f.close()
         self.compiled = utils.compile_string(generator.output, self.desc)
 
     def render(self, glob, loc={}):

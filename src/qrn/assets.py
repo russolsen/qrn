@@ -13,9 +13,9 @@ def top_n(ary, n):
 def link_to_page(page, fmt='html'):
     url = "/" + page.out_path.path()
     if fmt == 'html':
-        return htapi.ATx(url, page.title.title()).encode()
+        return htapi.ATx(url, page.title).encode()
     else:
-        return f'[{page.title.title()}]({url})'
+        return f'[{page.title}]({url})'
   
 def image_tag(url):
     return htapi.Img(url).encode()
@@ -39,14 +39,22 @@ class Asset:
         self.out_path = RelativePath.from_path(site.out_root, path)
         self.fmt = utils.get_suffix(path)
         self.name = utils.get_filename(path)
-        self.categories = []
         self.attrs ={}
         self.prepare()
+        site.add_asset(self)
 
     def prepare(self):
         pass
 
     def process(self):
+        if self.is_outdated():
+            logging.info("%s out of date, processing.", self)
+            print(f'Processing {self.name}.')
+            self.do_process()
+        else:
+            logging.info("%s is up to date.", self)
+
+    def do_process(self):
         pass
 
     def compute_content(self, locs=None):
@@ -66,6 +74,10 @@ class Asset:
     def get_layout(self):
         return self.attrs.get('layout', None)
 
+    def add_to_index(self, asset_index):
+        asset_index.add(self, *self.categories)
+
+
     # Anything in self.attrs becomes a field on the object.
     # Handy because this means that attrs stored in the asset headers
     # magically become fields on the Asset instance.
@@ -76,7 +88,7 @@ class Asset:
         raise AttributeError(f"'{cname}' object has no attribute '{name}'")
 
     def __repr__(self):
-        return f'{type(self)}: {self.path}'
+        return f'{type(self).__name__}: {self.path}'
 
 class TemplatedAsset(Asset):
     """And asset that had a header is is run thru the EPy templating."""
@@ -88,8 +100,7 @@ class TemplatedAsset(Asset):
     def convert(self, content):
         return content
 
-    def process(self):
-        print("process", self)
+    def do_process(self):
         content = self.compute_content()
         opath = self.full_opath()
         utils.write_file(content, opath, "w")
@@ -112,10 +123,12 @@ class TemplatedAsset(Asset):
         # the templates to include another asset.
 
         def include(path):
+            logging.info("Including page %s.", path)
             asset = self.factory.asset_for_path(path)
             my_env = env.copy()
             my_env['included_page'] = asset
             text = asset.compute_content(my_env)
+            logging.debug("Included text %s.", text)
             return text
 
         # Make sure we have a reference to the current page and
@@ -151,7 +164,6 @@ class MarkdownAsset(TemplatedAsset):
         self.out_path = self.out_path.modify(suffix="html")
 
     def convert(self, content):
-        print("convert content")
         return converters.md_to_html(content)
 
 class HTMLAsset(TemplatedAsset):
@@ -163,7 +175,6 @@ class HTMLAsset(TemplatedAsset):
     def prepare(self):
         ipath = self.full_ipath()
         self.attrs = utils.read_header(ipath)
-        print("html attrs", self.attrs)
 
 class HAMLAsset(TemplatedAsset):
     """HAML page, has a header and does templating, possibly with a layout."""
@@ -179,7 +190,7 @@ class HAMLAsset(TemplatedAsset):
 class OtherAsset(Asset):
     """Generic asset, just gets copied."""
 
-    def process(self):
+    def do_process(self):
         ipath = self.full_ipath()
         opath = self.full_opath()
         converters.copy_file(ipath, opath)
@@ -190,7 +201,7 @@ class SassAsset(Asset):
     def prepare(self):
         self.out_path = self.out_path.modify(suffix="css")
 
-    def process(self):
+    def do_process(self):
         ipath = self.full_ipath()
         opath = self.full_opath()
         return converters.sass_to_css(ipath, opath)
@@ -215,7 +226,6 @@ class AssetFactory:
         return clz(self.site, self, path)
 
     def assets_for_paths(self, paths):
-        print('Paths:', paths)
         return map(self.asset_for_path, paths)
 
 def standard_asset_factory(site):
@@ -227,4 +237,43 @@ def standard_asset_factory(site):
     asset_factory.add_asset_class('scss', SassAsset)
     return asset_factory
 
+class AssetIndex:
+    """Track assets by their categories."""
 
+    def __init__(self):
+        self.idx = {}
+        self.assets = []
+
+    def add(self, asset, *categories):
+        self.assets.append(asset)
+        for c in categories:
+            assets = self.idx.get(c, set())
+            assets.add(asset)
+            self.idx[c] = assets
+
+    def newest_assets(self, n):
+        return self.assets[0:n]
+
+    def assets_in_category(self, category):
+        return self.idx.get(category, set())
+
+    def categories(self):
+        return self.idx.keys()
+
+    def __repr__(self):
+        return f'(AssetIndex): {self.idx.keys()}'
+
+class Site:
+    def __init__(self, title, url, root, out_root):
+        self.title = title
+        self.url = url
+        self.root = root
+        self.out_root = out_root
+        self.index = AssetIndex()
+
+    def add_asset(self, asset):
+        categories = asset.attrs.get('categories', [])
+        self.index.add(asset, *categories)
+
+    def __repr__(self):
+        return f'Site: {self.title} {self.url} {self.index}'

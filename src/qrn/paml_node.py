@@ -92,6 +92,16 @@ class ContentNode:
         #print("type generator:", type(generator))
         generator.text(self.text)
 
+    def add_child(self, kid):
+        logging.info("Add child: %s", kid)
+        s = f'Cannot add children to {self}.'
+        raise Exception(s)
+
+    def add_all(self, kids):
+        logging.info("Add all: %s", kids)
+        s = f'Cannot add children to {self}.'
+        raise Exception(s)
+
     def __repr__(self):
         return f'<<ContentNode: {self.text}>>'
 
@@ -115,10 +125,11 @@ class CommandNode(PamlNode):
         self.text = text
 
     def expand(self, generator):
-        logging.info("Compile: %s", self.text)
+        logging.info("Compile command: %s", self.text)
         generator.code(self.text)
 
         if START_RE.match(self.text):
+            logging.info("Indent!")
             generator.indent()
         self._expand_children(generator)
         if START_RE.match(self.text):

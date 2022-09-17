@@ -23,13 +23,16 @@ class CodeGenerator:
 
     def _write(self, value):
         #print("compiler, write:", value)
+        logging.debug("CodeGenerator: write %s", value)
         self.output += str(value)
 
     def indent(self):
         self.depth += 1
+        logging.debug("CodeGenerator: indent %s", self.depth)
 
     def dedent(self):
         self.depth -= 1
+        logging.debug("CodeGenerator: dedent %s", self.depth)
 
     def emit_indent(self):
         self._write(' '*(self.depth*2))

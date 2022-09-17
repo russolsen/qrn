@@ -8,6 +8,7 @@ import yaml
 import pprint
 import subprocess
 import logging
+from functools import partial
 from io import StringIO
 from contextlib import redirect_stdout
 
@@ -24,7 +25,7 @@ def read_file(path, mode='r'):
     return result
 
 def write_file(contents, path, mode='w'):
-    logging.debug(f'write file: %s', path)
+    logging.debug('Write file: %s', path)
     result = None
     with open(path, mode) as f:
         f.write(contents)
@@ -47,20 +48,27 @@ def __read_header_text(path):
                 return result
             result += line
             line = f.readline()
+    return result
 
 def read_yaml(path):
     text = read_file(path)
-    return yaml.safe_load(text)
+    if text:
+        return yaml.safe_load(text)
+    return {}
 
 def read_header(path):
+    logging.debug('Read header: %s', path)
     text = __read_header_text(path)
-    return yaml.safe_load(text)
+    if text:
+        return yaml.safe_load(text)
+    return {}
 
 def read_body(path):
     with open(path) as f:
       __read_until_match(f, MarkerRE)
       __read_until_match(f, MarkerRE)
-      return f.read()
+      result = f.read()
+      return result
 
 def change_suffix(p, newsuffix):
     parts = os.path.splitext(p)
@@ -98,6 +106,25 @@ def globs(globs, fn):
         if fnmatch.fnmatch(fn, g):
             return True
     return False
+
+def scan(directory, pats, exclusions=[], include_dirs=False):
+    """Python version of the find command."""
+
+    logging.info('Scan files dir: %s pats %s', directory, pats)
+    paths = set()
+    for g in pats:
+        these_paths = xglob(directory, g)
+        paths = paths.union(set(these_paths))
+
+    result = []
+    for p in paths:
+        if globs(exclusions, p):
+            continue
+        result.append(p)
+    
+    if not include_dirs:
+        result = filter(partial(is_file, directory), result)
+    return list(result)
 
 def mk_dirs(directory, *paths):
     os.makedirs(directory, exist_ok=True)
@@ -174,6 +201,10 @@ def emap(f, coll):
     """Like map, but not lazy."""
     return list(map(f, coll))
 
+def partition(l, n):
+    for i in range(0, len(l), n):
+        yield l[i:i+n]
+
 def lfilter(f, coll):
     """Like filter, but not lazy."""
     return list(filter(f, coll))
@@ -198,7 +229,6 @@ def memoize(f):
 
 def log_code(code_str):
     """Given code in a string, log it out line by line."""
-    return
     logging.debug('---- Code ----')
     lines = code_str.split('\n')
     for i in range(len(lines)):

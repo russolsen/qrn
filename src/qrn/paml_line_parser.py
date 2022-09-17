@@ -42,7 +42,7 @@ class PamlLineParser:
         result = ''
         ch = self.getc()
         #print(f'ch: {ch}')
-        while ch and re.match(r'\w', ch):
+        while ch and re.match(r'[\w\-]', ch):
             result += ch
             ch = self.getc()
             #print(f'ch: {ch}')
@@ -81,7 +81,7 @@ class PamlLineParser:
     def parse_command(self):
         self.getc()
         text = self.remaining().strip()
-        return paml_node.CommandNode(text, False)
+        return paml_node.CommandNode(text)
 
     def parse_expression(self):
         self.getc()

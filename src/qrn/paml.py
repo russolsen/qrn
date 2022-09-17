@@ -135,7 +135,6 @@ class PamlCompiler:
         self.lines = lines
         self.desc = desc
         self.compiled = None
-        self.compile()
 
     def generate_code(self):
         parser = PamlParser(self.lines)
@@ -155,8 +154,18 @@ class PamlCompiler:
     def evaluate(cls, content, name, globs, locs):
         #lines = list(map(lambda s: s+'\n', content.split('\n')))
         lines = content.split('\n')
-        #print(lines)
         c = cls(lines, name)
+        #print("---")
+        #print(c.generate_code())
+        #print("---")
+        c.compile()
         return utils.exec_prog_output(c.compiled, globs, locs)
+
+    @classmethod
+    def compile_file(cls, path):
+        with open(path) as f:
+            lines = f.readlines()
+            c = cls(lines)
+            return c.generate_code()
 
 

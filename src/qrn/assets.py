@@ -1,10 +1,12 @@
 import logging
+from functools import partial
+
 import qrn.utils as utils
 import qrn.converters as converters
 import qrn.htapi as htapi
 from qrn.relative_path import RelativePath 
-from qrn.epy import EPyCompiler
-from qrn.paml import PamlCompiler
+import qrn.paml as paml
+import qrn.epy as epy
 
 def top_n(ary, n):
     n = min(len(ary), n)
@@ -30,16 +32,24 @@ def sort_by_date(pages, reverse=True):
     pages.sort(key=(lambda p: p.created_at), reverse=reverse)
     return pages
 
+def attr_matches(attr, value, obj):
+    v = getattr(obj, attr, None)
+    return v == value
+
+def attr_value(attr, default, obj):
+    v = getattr(obj, attr, default)
+    return v
+
 class Asset:
     def __init__(self, site, factory, path):
         self.site = site
+        logging.debug('New asset, factory %s', factory)
         self.factory = factory
         self.path = path
         self.in_path = RelativePath.from_path(site.root, path)
         self.out_path = RelativePath.from_path(site.out_root, path)
         self.fmt = utils.get_suffix(path)
         self.name = utils.get_filename(path)
-        self.attrs ={}
         self.prepare()
         site.add_asset(self)
 
@@ -53,6 +63,10 @@ class Asset:
             self.do_process()
         else:
             logging.info("%s is up to date.", self)
+
+    def set_attrs(self, attrs):
+        for name in attrs:
+            setattr(self, name, attrs[name])
 
     def do_process(self):
         pass
@@ -72,20 +86,10 @@ class Asset:
         return self.out_path.full_path()
 
     def get_layout(self):
-        return self.attrs.get('layout', None)
+        return getattr(self, 'layout', None)
 
     def add_to_index(self, asset_index):
         asset_index.add(self, *self.categories)
-
-
-    # Anything in self.attrs becomes a field on the object.
-    # Handy because this means that attrs stored in the asset headers
-    # magically become fields on the Asset instance.
-    def __getattr__(self, name):
-        if name in self.attrs:
-            return self.attrs[name]
-        cname = type(self).__name__
-        raise AttributeError(f"'{cname}' object has no attribute '{name}'")
 
     def __repr__(self):
         return f'{type(self).__name__}: {self.path}'
@@ -93,8 +97,8 @@ class Asset:
 class TemplatedAsset(Asset):
     """And asset that had a header is is run thru the EPy templating."""
 
-    def __init__(self, cclass, site, factory, path):
-        self.compiler_class = cclass
+    def __init__(self, make_template_f, site, factory, path):
+        self.make_template_f = make_template_f
         super().__init__(site, factory, path)
 
     def convert(self, content):
@@ -123,7 +127,7 @@ class TemplatedAsset(Asset):
         # the templates to include another asset.
 
         def include(path):
-            logging.info("Including page %s.", path)
+            logging.info("Including page %s %s.", path, self.factory)
             asset = self.factory.asset_for_path(path)
             my_env = env.copy()
             my_env['included_page'] = asset
@@ -140,7 +144,8 @@ class TemplatedAsset(Asset):
         # epy compilation.
         ipath = self.full_ipath()
         content = utils.read_body(ipath)
-        content = self.compiler_class.evaluate(content, self.path, globals(), env)
+        template_f = self.make_template_f(content, self.path)
+        content = template_f(globals(), env)
         content = self.convert(content)
 
         # If a layout is speficied, use that.
@@ -156,11 +161,11 @@ class MarkdownAsset(TemplatedAsset):
     """Markdown page, has a header and does templating, possibly with a layout"""
 
     def __init__(self, site, factory, path):
-        super().__init__(EPyCompiler, site, factory, path)
+        super().__init__(epy.make_template_f, site, factory, path)
 
     def prepare(self):
         ipath = self.full_ipath()
-        self.attrs = utils.read_header(ipath)
+        self.set_attrs(utils.read_header(ipath))
         self.out_path = self.out_path.modify(suffix="html")
 
     def convert(self, content):
@@ -170,22 +175,21 @@ class HTMLAsset(TemplatedAsset):
     """HTML page, has a header and does templating, possibly with a layout"""
 
     def __init__(self, site, factory, path):
-        super().__init__(EPyCompiler, site, factory, path)
+        super().__init__(epy.make_template_f, site, factory, path)
 
     def prepare(self):
         ipath = self.full_ipath()
-        self.attrs = utils.read_header(ipath)
+        self.set_attrs(utils.read_header(ipath))
 
 class HAMLAsset(TemplatedAsset):
     """HAML page, has a header and does templating, possibly with a layout."""
 
     def __init__(self, site, factory, path):
-        super().__init__(PamlCompiler, site, factory, path)
+        super().__init__(paml.make_template_f, site, factory, path)
 
     def prepare(self):
         ipath = self.full_ipath()
-        self.attrs = utils.read_header(ipath)
-        self.out_path = self.out_path.modify(suffix="html")
+        self.set_attrs(utils.read_header(ipath))
 
 class OtherAsset(Asset):
     """Generic asset, just gets copied."""
@@ -242,20 +246,16 @@ class AssetIndex:
 
     def __init__(self):
         self.idx = {}
-        self.assets = []
 
-    def add(self, asset, *categories):
-        self.assets.append(asset)
+    def add(self, asset, categories):
         for c in categories:
             assets = self.idx.get(c, set())
             assets.add(asset)
             self.idx[c] = assets
 
-    def newest_assets(self, n):
-        return self.assets[0:n]
-
     def assets_in_category(self, category):
-        return self.idx.get(category, set())
+        logging.debug("AssetIndex, assets in category %s", category)
+        return list(self.idx.get(category, []))
 
     def categories(self):
         return self.idx.keys()
@@ -263,17 +263,71 @@ class AssetIndex:
     def __repr__(self):
         return f'(AssetIndex): {self.idx.keys()}'
 
+class SortedCollection:
+    def __init__(self, f, contents=[]):
+        self.f = f
+        self.contents = contents.copy()
+        self.sorted = False
+
+    def first_n(self, n):
+        self._sort_contents()
+        return self.sorted_contents[0:n]
+
+    def append(self, x):
+        self.contents.append(x)
+        self.sorted = False
+
+    def _sort_contents(self):
+        if not self.sorted:
+            self.contents.sort(self.f, reverse=True)
+            self.sorted = True
+
+    def __len__(self):
+        return len(self.contents)
+
+    def __iter__(self):
+        self._sort_contents()
+        for each in self.contents:
+              yield each
+
+    def __getitem__(self, i):
+        self._sort_contents()
+        return self.contents[i]
+
+    def __setitem__(self, i, x):
+        self.contents[i] = x
+        self.sorted = False
+
 class Site:
-    def __init__(self, title, url, root, out_root):
+    def __init__(self, title, url, sort_f, root, out_root):
         self.title = title
         self.url = url
         self.root = root
         self.out_root = out_root
+        self.assets = SortedCollection(sort_f)
         self.index = AssetIndex()
 
+    def first_n(self, n):
+        return self.assets[0:n]
+
+    def related_assets(self, asset, n=999):
+        categories = getattr(asset, 'categories', [])
+        logging.debug('page: %s categories %s', self, categories)
+        if categories:
+            category = categories[0]
+            logging.debug('page: %s category %s', self, category)
+            related = self.index.assets_in_category(category)
+            return related[0:n]
+        return []
+
     def add_asset(self, asset):
-        categories = asset.attrs.get('categories', [])
-        self.index.add(asset, *categories)
+        if getattr(asset, 'kind', '') in ['article']:
+            self.assets.append(asset)
+            categories = getattr(asset, 'categories', [])
+            self.index.add(asset, categories)
+
+    def assets_matching(self, attr, value):
+        return filter(partial(attr_matches, attr, value), self.assets)
 
     def __repr__(self):
         return f'Site: {self.title} {self.url} {self.index}'

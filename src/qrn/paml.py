@@ -130,42 +130,20 @@ class PamlParser:
         return node
 
 
-class PamlCompiler:
-    def __init__(self, lines, desc="Paml"):
-        self.lines = lines
-        self.desc = desc
-        self.compiled = None
-
-    def generate_code(self):
-        parser = PamlParser(self.lines)
-        generator = CodeGenerator()
+def make_template(text, desc):
+    lines = text.split('\n')
+    parser = PamlParser(lines)
+    generator = CodeGenerator()
+    node = parser.read_node()
+    while node:
+        node.expand(generator)
         node = parser.read_node()
-        while node:
-            node.expand(generator)
-            node = parser.read_node()
-        return generator.output
+    code = utils.compile_string(generator.output, desc)
+    return code
 
-    def compile(self):
-        code = self.generate_code()
-        self.compiled = utils.compile_string(code, self.desc)
-        return self.compiled
-
-    @classmethod
-    def evaluate(cls, content, name, globs, locs):
-        #lines = list(map(lambda s: s+'\n', content.split('\n')))
-        lines = content.split('\n')
-        c = cls(lines, name)
-        #print("---")
-        #print(c.generate_code())
-        #print("---")
-        c.compile()
-        return utils.exec_prog_output(c.compiled, globs, locs)
-
-    @classmethod
-    def compile_file(cls, path):
-        with open(path) as f:
-            lines = f.readlines()
-            c = cls(lines)
-            return c.generate_code()
-
-
+def make_template_f(text, desc="template"):
+    code = make_template(text, desc)
+    def render(globs={}, locs={}):
+        return utils.exec_prog_output(code, globs, locs)
+    return render
+    

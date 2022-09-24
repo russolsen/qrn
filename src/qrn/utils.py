@@ -39,9 +39,11 @@ def __read_until_match(f, regex):
     return None
 
 def __read_header_text(path):
-    result = ''
     with open(path) as f:
-        __read_until_match(f, MarkerRE)
+        if not __has_header(f):
+            return ''
+        result = ''
+        f.readline()
         line = f.readline()
         while line:
             if re.search(MarkerRE, line):
@@ -49,6 +51,11 @@ def __read_header_text(path):
             result += line
             line = f.readline()
     return result
+
+def __has_header(f):
+    line = f.readline()
+    f.seek(0)
+    return re.search(MarkerRE, line)
 
 def read_yaml(path):
     text = read_file(path)
@@ -65,10 +72,11 @@ def read_header(path):
 
 def read_body(path):
     with open(path) as f:
-      __read_until_match(f, MarkerRE)
-      __read_until_match(f, MarkerRE)
-      result = f.read()
-      return result
+        if __has_header(f):
+            __read_until_match(f, MarkerRE)
+            __read_until_match(f, MarkerRE)
+        result = f.read()
+        return result
 
 def change_suffix(p, newsuffix):
     parts = os.path.splitext(p)
@@ -184,6 +192,28 @@ def compose(*funcs):
             result = f(result)
         return result
     return invoke
+
+class _Multi:
+    def __init__(self, dispatch_f, default_f=None):
+       self.dispatch_f = dispatch_f
+       self.default_f = default_f
+       self.methods = {}
+
+    def _add_method(self, dispatch_v, f):
+        self.methods[dispatch_v] = f
+
+    def __call__(self, *args):
+        dispatch_v = self.dispatch_f(*args)
+
+        f = self.methods.get(dispatch_v, self.default_f)
+        return f(*args)
+
+def defmulti(dispatch_f, default_f=None):
+    return _Multi(dispatch_f, default_f)
+
+def defmethod(mm, dispatch_f, f):
+    mm._add_method(dispatch_f, f)
+
 
 def arrow(x, *funcs):
     for f in funcs:

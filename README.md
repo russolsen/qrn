@@ -1,7 +1,7 @@
 # QRN: A simple, highly opinionated static site generator
 
 QRN is a static site generator that is as simple as I can make
-it while still be useful. QRN assumes that most of your content
+it while still being useful. QRN assumes that most of your content
 is in markdown format, that you are using sass/scss or plain old css
 for styling. QRN is also geared towards modest sized content, the
 kind of thing you might find in a personal blog.

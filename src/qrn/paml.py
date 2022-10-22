@@ -64,7 +64,7 @@ class PamlParser:
             line = self.lines[self.iline]
             self.iline += 1
             line = line.rstrip()
-            logging.info('New line: [%s]', line)
+            logging.debug('New line: [%s]', line)
             this_depth, line = indent_level(line)
             while this_depth > self.depth:
                 self.tokens.append(INDENT)
@@ -79,6 +79,7 @@ class PamlParser:
         if self.itoken >= len(self.tokens):
             return EOF
         result = self.tokens[self.itoken]
+        logging.debug("Paml read token %s", result)
         self.itoken += 1
         return result
 
@@ -95,8 +96,10 @@ class PamlParser:
     def read_collection(self):
         result = []
         tok = self.read_token()
+        logging.debug("reading collection %s", tok)
         while tok != OUTDENT and (tok != EOF):
             self.unread_token()
+            logging.debug("reading collection %s", tok)
             expr = self.read_node()
             result.append(expr)
             tok = self.read_token()
@@ -104,9 +107,8 @@ class PamlParser:
 
     def read_node(self):
         header = self.read_token()
-        #print(repr(header))
         if header == EOF:
-            logging.info('eof')
+            logging.debug('eof')
             return None
         elif (header == INDENT):
             logging.warning('unex outdent')
@@ -121,16 +123,14 @@ class PamlParser:
             self.read_token()
             children = self.read_collection()
 
-        #print(f"***Creating node with {header} and {children}")
         node = PamlLineParser(header).parse()
-        #print(node)
         if children:
             #print(f'Adding children to node {node}: {children}')
             node.add_all(children)
         return node
 
 
-def make_template(text, desc):
+def template_from_text(text, desc='template'):
     lines = text.split('\n')
     parser = PamlParser(lines)
     generator = CodeGenerator()
@@ -138,12 +138,19 @@ def make_template(text, desc):
     while node:
         node.expand(generator)
         node = parser.read_node()
+    logging.debug("template from text, len of gen output %s", len(generator.output))
     code = utils.compile_string(generator.output, desc)
+    logging.debug("code: %s", code)
     return code
 
-def make_template_f(text, desc="template"):
-    code = make_template(text, desc)
+def template_f_from_text(text, desc='template'):
+    logging.debug('template_f from text %s', text)
+    code = template_from_text(text, desc)
+    logging.debug('code: %s', code)
     def render(globs={}, locs={}):
         return utils.exec_prog_output(code, globs, locs)
     return render
     
+def template_f_from_path(path):
+    text = utils.read_file(path)
+    return template_f_from_text(text, path)

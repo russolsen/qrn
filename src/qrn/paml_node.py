@@ -9,7 +9,7 @@ class PamlNode:
         self.children.append(kid)
 
     def add_all(self, kids):
-        logging.info("Add all: %s", kids)
+        logging.debug("Add all: %s", kids)
         for k in kids:
             self.add_child(k)
 
@@ -63,7 +63,7 @@ class ElementNode(PamlNode):
             generator.text(self.text)
 
     def expand(self, generator):
-        logging.info('Compile <%s> %s', self.tag, self.text)
+        logging.debug('Compile <%s> %s', self.tag, self.text)
         generator.text(f'<{self.tag}')
         self._expand_attrs(generator)
 
@@ -84,7 +84,7 @@ class ElementNode(PamlNode):
 
 class ContentNode:
     def __init__(self, text):
-        logging.info("New content node: %s", text)
+        logging.debug("New content node: %s", text)
         self.text = text
 
     def expand(self, generator):
@@ -93,12 +93,12 @@ class ContentNode:
         generator.text(self.text)
 
     def add_child(self, kid):
-        logging.info("Add child: %s", kid)
+        logging.debug("Add child: %s", kid)
         s = f'Cannot add children to {self}.'
         raise Exception(s)
 
     def add_all(self, kids):
-        logging.info("Add all: %s", kids)
+        logging.debug("Add all: %s", kids)
         s = f'Cannot add children to {self}.'
         raise Exception(s)
 
@@ -109,27 +109,26 @@ START_RE = re.compile(r'.*:$')
 
 class ExpressionNode(PamlNode):
     def __init__(self, text):
-        logging.info("New expr node: %s", text)
+        logging.debug("New expr node: %s", text)
         super().__init__()
         self.text = text
 
     def expand(self, generator):
-        logging.info("Compile: %s", self.text)
+        logging.debug("Compile: %s", self.text)
         generator.expr(self.text)
         self._expand_children(generator)
 
 class CommandNode(PamlNode):
     def __init__(self, text):
-        logging.info("New command node: %s", text)
+        logging.debug("New command node: %s", text)
         super().__init__()
         self.text = text
 
     def expand(self, generator):
-        logging.info("Compile command: %s", self.text)
+        logging.debug("Compile command: %s", self.text)
         generator.code(self.text)
 
         if START_RE.match(self.text):
-            logging.info("Indent!")
             generator.indent()
         self._expand_children(generator)
         if START_RE.match(self.text):

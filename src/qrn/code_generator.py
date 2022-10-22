@@ -22,7 +22,6 @@ class CodeGenerator:
         #self.output += '_f = StringIO()\n'
 
     def _write(self, value):
-        #print("compiler, write:", value)
         logging.debug("CodeGenerator: write %s", value)
         self.output += str(value)
 

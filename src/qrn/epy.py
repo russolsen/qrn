@@ -28,16 +28,22 @@ def _compile_template(fragments):
         elif INC_RE.search(frag):
             expr = frag[3:]
             generator.expr(expr)
+    if generator.depth != 0:
+        raise Exception("Unclosed blocks in epy template!")
     return generator.output
 
-def make_template(ttext, desc='template'):
+def template_from_text(ttext, desc='template'):
     fragments = re.split(SplitRE, ttext)
     output = _compile_template(fragments)
     code = utils.compile_string(output, desc)
     return code
 
-def make_template_f(ttext, desc='template'):
-    code = make_template(ttext, desc)
+def template_f_from_text(ttext, desc='template'):
+    code = template_from_text(ttext, desc)
     def render(globs={}, locs={}):
         return utils.exec_prog_output(code, globs, locs)  
     return render
+
+def template_f_from_path(path):
+    text = utils.read_file(path)
+    return template_f_from_text(text, path)

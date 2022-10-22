@@ -9,6 +9,7 @@ import pprint
 import subprocess
 import logging
 from functools import partial
+from pathlib import Path
 from io import StringIO
 from contextlib import redirect_stdout
 
@@ -63,6 +64,10 @@ def read_yaml(path):
         return yaml.safe_load(text)
     return {}
 
+def write_yaml(data, path):
+    with open(path, 'w') as f:
+        yaml.dump(data, f)
+
 def read_header(path):
     logging.debug('Read header: %s', path)
     text = __read_header_text(path)
@@ -78,35 +83,41 @@ def read_body(path):
         result = f.read()
         return result
 
-def change_suffix(p, newsuffix):
-    parts = os.path.splitext(p)
-    return f'{parts[0]}.{newsuffix}'
-
-def get_suffix(p):
-    parts = os.path.splitext(p)
-    return parts[1][1:]
-
-def get_filename(p):
-    parts = os.path.split(p)
-    return parts[1]
-
-def remove_suffix(p):
-    parts = os.path.splitext(p)
-    return parts[0]
-
-def split_path(path):
-    d = os.path.dirname(path)
-    filename = os.path.basename(path)
-    parts = os.path.splitext(filename)
-    name = parts[0]
-    suffix = parts[1][1:]
-    return [d, name, suffix]
-
 def xglob(directory, pat):
     cwd = os.getcwd()
     os.chdir(directory)
     result = glob.glob(pat, recursive=True)
     os.chdir(cwd)
+    return result
+
+def find_paths(pat, skip=True):
+    matches = glob.glob(pat, recursive=True)
+    if skip:
+        matches = filter(
+                lambda path: not re.search('/_', path),
+                matches)
+    return emap(Path, matches)
+
+def match_pat(pat, include_all=False):
+        spaths = glob.glob(pat)
+        if include_all:
+            return [Path(p) for p in spaths]
+        paths = [Path(p) for p in spaths if not re.search('/_', p)]
+        return paths
+
+def match_pats(*pats, include_all=False):
+    results = []
+    for p in pats:
+        results += match_pat(p, include_all)
+    return results
+
+def relocate(path, new_dir, suffix=None):
+    new_dirs = Path(new_dir).parts
+    parts = list(path.parts)
+    parts[0:len(new_dirs)] = new_dirs
+    result = Path(*parts)
+    if suffix:
+        result = result.with_suffix(suffix)
     return result
 
 def globs(globs, fn):
@@ -115,24 +126,6 @@ def globs(globs, fn):
             return True
     return False
 
-def scan(directory, pats, exclusions=[], include_dirs=False):
-    """Python version of the find command."""
-
-    logging.info('Scan files dir: %s pats %s', directory, pats)
-    paths = set()
-    for g in pats:
-        these_paths = xglob(directory, g)
-        paths = paths.union(set(these_paths))
-
-    result = []
-    for p in paths:
-        if globs(exclusions, p):
-            continue
-        result.append(p)
-    
-    if not include_dirs:
-        result = filter(partial(is_file, directory), result)
-    return list(result)
 
 def mk_dirs(directory, *paths):
     os.makedirs(directory, exist_ok=True)
@@ -141,13 +134,18 @@ def mk_dirs(directory, *paths):
         logging.info('Making dir %s', d)
         os.makedirs(d, exist_ok=True)
 
-def outdated(src_path, dst_path):
+def newer(path1, path2):
     try:
-        src_mod = os.path.getmtime(src_path)
-        dst_mod = os.path.getmtime(dst_path)
-        return src_mod > dst_mod
+        p1_mod = os.path.getmtime(path1)
+    except FileNotFoundError:
+        return False
+
+    try:
+        p2_mod = os.path.getmtime(path2)
     except FileNotFoundError:
         return True
+
+    return p1_mod > p2_mod
 
 def is_file(directory, path):
     path = f'{directory}/{path}'
@@ -157,99 +155,18 @@ def directories(paths):
     dirs = filter(identity, map(os.path.dirname, paths))
     return sorted(set(dirs))
 
-def get_filestem(p):
-    parts = os.path.splitext(os.path.basename(p))
-    return parts[0]
 
-def assoc(d, *kvs):
-    result = d.copy()
-    for i in range(0, len(kvs), 2):
-        result[kvs[i]] = kvs[i+1]
-    return result
-
-def with_keys(d, *ks):
-    result = {}
-    for k in ks:
-        if k in d:
-            result[k] = d[k]
-    return result
-
-def identity(x):
-    return x
-
-def compose(*funcs):
-    """Return a function that cascasdes all of the supplied functions."""
-    funcs = list(funcs)
-    if (len(funcs) == 1) and (type(funcs[0]) == list):
-      return compose(*funcs[0])
-    elif len(funcs) == 1:
-      return funcs[0]
-
-    def invoke(arg):
-        result = arg
-        for f in funcs:
-            #print('invoke, calling', f)
-            result = f(result)
-        return result
-    return invoke
-
-class _Multi:
-    def __init__(self, dispatch_f, default_f=None):
-       self.dispatch_f = dispatch_f
-       self.default_f = default_f
-       self.methods = {}
-
-    def _add_method(self, dispatch_v, f):
-        self.methods[dispatch_v] = f
-
-    def __call__(self, *args):
-        dispatch_v = self.dispatch_f(*args)
-
-        f = self.methods.get(dispatch_v, self.default_f)
-        return f(*args)
-
-def defmulti(dispatch_f, default_f=None):
-    return _Multi(dispatch_f, default_f)
-
-def defmethod(mm, dispatch_f, f):
-    mm._add_method(dispatch_f, f)
-
-
-def arrow(x, *funcs):
-    for f in funcs:
-        x = f(x)
-    return x
-
-def doall(f, coll):
-    """Apply f to each element in coll, do not keep results."""
-    for element in coll:
-        #print("do all call fun")
-        f(element)
-        #print("do all DONE call fun")
-
-def emap(f, coll):
-    """Like map, but not lazy."""
-    return list(map(f, coll))
-
-def partition(l, n):
-    for i in range(0, len(l), n):
-        yield l[i:i+n]
-
-def lfilter(f, coll):
-    """Like filter, but not lazy."""
-    return list(filter(f, coll))
-
-def complement(f):
-    """Returns a function that returns the logical not of the supplied function."""
-    def not_f(*args):
-        return not f(*args)
-    return not_f
+def always(v):
+    def _always(*args):
+        return v
+    return _always
 
 def memoize(f):
     """Return a function that takes the same args as f but caches results."""
     cache={}
     def standin(*args):
         if args in cache:
+            logging.info('Cache hit for %s.', args)
             return cache[args]
         result = f(*args)
         cache[args] = result
@@ -265,7 +182,11 @@ def log_code(code_str):
         logging.debug('%d: %s', i+1, lines[i])
 
 def compile_string(s, desc):
-    return compile(s, desc, "exec")
+    logging.debug('compile string [[%s]]', s)
+    logging.debug('compile desc [[%s]]', desc)
+    result = compile(s, desc, "exec")
+    logging.debug('compile string result %s', result)
+    return result
 
 def exec_prog_output(compiled, glob={}, loc={}):
     """Execute the code supplied, returning it's stdout contents."""

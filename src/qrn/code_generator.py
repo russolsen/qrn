@@ -18,35 +18,27 @@ class CodeGenerator:
 
     def clear(self):
         self.output = ''
-        #self.output += 'from io import StringIO\n'
-        #self.output += '_f = StringIO()\n'
 
-    def _write(self, value):
-        logging.debug("CodeGenerator: write %s", value)
-        self.output += str(value)
+    def _write(self, *values):
+        for v in values:
+          self.output += str(v)
 
     def indent(self):
         self.depth += 1
-        logging.debug("CodeGenerator: indent %s", self.depth)
 
     def dedent(self):
         self.depth -= 1
-        logging.debug("CodeGenerator: dedent %s", self.depth)
 
     def emit_indent(self):
         self._write(' '*(self.depth*2))
 
     def text(self, text):
         self.emit_indent()
-        self._write('print(')
-        self._write(repr(text))
-        self._write(', end="")\n')
+        self._write('print(', repr(text), ', end="")\n')
 
     def expr(self, expr):
         self.emit_indent()
-        self._write('print(')
-        self._write(expr)
-        self._write(', end="")\n')
+        self._write('print(', expr, ', end="")\n')
 
     def code(self, code):
         self.emit_indent()

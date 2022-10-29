@@ -3,17 +3,12 @@ import glob
 import shutil
 import os.path
 import re
-import pprint
 from functools import partial
 from enum import Enum
-
 import qrn.utils as utils
 
-PPrinter = pprint.PrettyPrinter(indent=4)
-pp = PPrinter.pprint
-
-NOT_APPLICABLE=8711
-COMPLETE=-1178
+NOT_APPLICABLE=utils.Special('NA')
+COMPLETE=utils.Special('CO')
 
 def build_rule(rule, context):
     for f in rule:
@@ -22,6 +17,11 @@ def build_rule(rule, context):
             return result
         context = result
     return context
+
+def build_rule_f(rule):
+    def _build_rule(context):
+        return build_rule(rule, context)
+    return _build_rule
 
 def build(rules, context):
     """Given a ruleset, invoke the first rule that applies."""

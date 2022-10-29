@@ -1,30 +1,40 @@
+"""Opinionated static site generator."""
+
 from pathlib import Path
 import logging
+import datetime
 import qrn.pipeline as pl
 import qrn.components as components
 import qrn.converters as converters
+import qrn.rss as rss
 import qrn.utils as utils
-
-INCLUDE_DIR = Path('content/_layouts')
 
 from qrn.expander import Expander
 
-def compute_html(ipath, page):
+def compute_text(ipath, page):
     """Compute the html resulting from expanding ipath."""
-    expander = Expander('content/_layouts', ipath, page)
+    expander = Expander('src/_layouts', ipath, page)
     return expander.expand()
 
 def build_html(context):
     """Build html from the source file."""
     ipath = context['sources'][0]
     page = context['attrs']
-    context['text'] = compute_html(ipath, page)
+    context['text'] = compute_text(ipath, page)
+    return context
+
+def build_xml(context):
+    """Build xml from the source file."""
+    ipath = context['sources'][0]
+    page = context['attrs']
+    context['text'] = compute_text(ipath, page)
     return context
 
 def write_text(context):
     """Write the text from the context to the output file."""
     opath = context['output']
     text = context['text']
+    logging.debug('Writing text to %s', opath)
     utils.write_file(text, opath)
     return context
 
@@ -42,10 +52,23 @@ def set_url(context):
     attrs['url'] = '/' + str(Path(*opath.parts[1:]))
     return context
 
-def insert_attr_f(name, value):
+#def insert_attr_f(name, value):
+#    """Insert an attribute into the attrs dictionary in the context."""
+#    def insert_attr(context):
+#        context['attrs'][name] = value
+#        return context
+#    return insert_attr
+
+def insert_attr_f(*args):
     """Insert an attribute into the attrs dictionary in the context."""
+    extra_keys = args[:-2]
+    key = args[-2]
+    value = args[-1]
     def insert_attr(context):
-        context['attrs'][name] = value
+        dictionary = context
+        for k in extra_keys:
+            dictionary = dictionary[k]
+        dictionary[key] = value
         return context
     return insert_attr
 
@@ -64,10 +87,12 @@ def debug_f(msg):
 
 is_html_src = components.is_suffix_f('.md', '.html', '.haml')
 
-def sort_by_date(pages):
-    pages.sort(key=lambda p: p.get('date', '0000'), reverse=True)
+EARLY = datetime.date(2004,1,1)
 
-def build_indices():
+def sort_by_date(pages):
+    pages.sort(key=lambda p: p.get('date', EARLY), reverse=True)
+
+def build_indices(output_dir='build'):
     """Compute the category and url indices."""
     by_url = {}
     by_category = {}
@@ -95,8 +120,9 @@ def build_indices():
 
     rule = [
             is_html_src,
-            components.to_dependency_f('build', '.html'),
+            components.to_dependency_f(output_dir, '.html'),
             components.read_attrs,
+            components.ispublished,
             set_url,
             collect_page,
             index_by_url,
@@ -104,60 +130,83 @@ def build_indices():
             utils.always(pl.COMPLETE)
             ]
 
-    paths = utils.match_pats('content/*', 'content/**/*')
+    paths = utils.match_pats('src/*', 'src/**/*')
     pl.build_all([rule, [utils.always(pl.COMPLETE)]], paths)
 
     sort_by_date(all_pages)
+    articles = list(filter(lambda p: p.get('kind', '') == 'article', all_pages))
 
     for category in by_category:
         sort_by_date(by_category[category])
 
-    return all_pages, by_url, by_category
+    return {'all_pages': all_pages,
+            'articles': articles,
+            'by_url': by_url,
+            'by_category': by_category}
 
-def build_site(site):
-    """Build the site, source in content result in build."""
-    sources = utils.match_pats('content/**/', 'content/*', 'content/**/*')
-    html_inc_files = utils.match_pats('content/_layouts/*', include_all=True)
-    css_inc_files = utils.match_pats('context/stylesheets/_*', include_all=True)
+def build_site(site, output_dir='build'):
+    """Build the site, source in src result in build."""
+    sources = utils.match_pats('src/**/', 'src/*', 'src/**/*')
+    html_inc_files = utils.match_pats('src/_layouts/*', include_all=True)
+    css_inc_files = utils.match_pats('src/**/_*.scss', 'src/**/_*.css', include_all=True)
+    print(css_inc_files)
+
+    logging.debug('Sources: %s', sources)
+    logging.debug('HTML INC: %s', html_inc_files)
+    logging.debug('CSS INC: %s', css_inc_files)
 
     html_rule = [
             is_html_src,
-            components.to_dependency_f('build', '.html', html_inc_files),
+            components.to_dependency_f(output_dir, '.html', html_inc_files),
             components.isoutdated,
-            components.print_path_f("Building"),
             components.read_attrs,
+            components.ispublished,
+            components.print_path_f("Building"),
             set_url,
-            insert_attr_f('site', site),
+            insert_attr_f('attrs', 'site', site),
             build_html,
             debug_f('Writing html'),
             write_text,
             utils.always(pl.COMPLETE)
             ]
 
+    xml_rule = [
+            components.is_suffix_f('.xml'),
+            components.to_dependency_f(output_dir),
+            components.read_attrs,
+            components.print_path_f("Building"),
+            insert_attr_f('attrs', 'site', site),
+            set_url,
+            build_xml,
+            write_text,
+            utils.always(pl.COMPLETE)
+            ]
+
     css_rule = [
             components.is_suffix_f('.sass', '.scss'),
-            components.to_dependency_f('build', '.css', css_inc_files),
+            components.to_dependency_f(output_dir, '.css', css_inc_files),
             components.isoutdated,
-            debug_f('Generating CSS'),
+            components.print_path_f("Building"),
             build_css,
             utils.always(pl.COMPLETE)
             ]
 
     dir_rule = [
             components.is_dir,
-            components.to_dependency_f('build'),
+            components.to_dependency_f(output_dir),
             debug_f('Create directory'),
             components.create_dir,
             utils.always(pl.COMPLETE)]
 
     copy_rule = [
-            components.to_dependency_f('build'),
+            components.to_dependency_f(output_dir),
             components.isoutdated,
+            components.print_path_f("Copying"),
             debug_f('Copy file'),
             components.copy_file,
             utils.always(pl.COMPLETE)]
 
-    rules = [html_rule, css_rule, dir_rule, copy_rule]
+    rules = [xml_rule, html_rule, css_rule, dir_rule, copy_rule]
 
     print('build....')
     return pl.build_all(rules, sources)

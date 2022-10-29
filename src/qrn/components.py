@@ -7,6 +7,7 @@ from qrn.pipeline import NOT_APPLICABLE, COMPLETE
 def to_dependency_f(target_dir, suffix=None, other_deps=[]):
     def to_dependancy(path):
         opath = utils.relocate(path, target_dir, suffix)
+        logging.debug('To dep %s => %s', path, opath)
         return {'output': opath, 'sources':([path] + other_deps)}
     return to_dependancy
 
@@ -32,6 +33,13 @@ def isoutdated(context):
     logging.info('Up to date: %s', output)
     return COMPLETE
 
+def ispublished(context):
+    attrs = context['attrs']
+    published = attrs.get('published', True)
+    if published:
+        return context
+    return COMPLETE
+    
 def copy_file(context):
     """Copy a file, unchanged."""
     ipath = context['sources'][0]
@@ -57,7 +65,6 @@ def print_path_f(msg):
     return _print_path
 
 def read_attrs(context):
-    #print(context)
     opath = context['output']
     ipath = context['sources'][0]
     attrs = utils.read_header(ipath)
@@ -68,6 +75,8 @@ def read_attrs(context):
 
 def create_dir(context):
     opath = context['output']
-    logging.info('Create dir %s', opath)
-    opath.mkdir(parents=True, exist_ok=True)
+    if not opath.is_dir():
+        print("Creating directory", opath)
+        logging.info('Create dir %s', opath)
+        opath.mkdir(parents=True, exist_ok=True)
     return context

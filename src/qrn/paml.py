@@ -1,35 +1,16 @@
 import re
 import logging
 import qrn.utils as utils
-import qrn.paml_node as paml_node
 from qrn.code_generator import CodeGenerator
 from qrn.paml_line_parser import PamlLineParser
 
-class Special:
-    """Special tokens."""
-
-    def __init__(self, tag):
-        self.tag = tag
-
-    def __str__(self):
-        return f'Special({self.tag})'
-
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return False
-        return self.tag == other.tag
-
-    def __hash__(self):
-        return hash(self.tag)
-
-INDENT = Special('==>')
-OUTDENT = Special('<==')
-EOF = Special('eof')
+INDENT = utils.Special('==>')
+OUTDENT = utils.Special('<==')
+EOF = utils.Special('eof')
 
 SPACING = 2
 
 def indent_level(s):
-    #print(f"indent level {s} {type(s)} {len(s)}")
     for n in range(len(s)):
         if (s[n] != ' '):
             return [n / SPACING, s[n:]]
@@ -44,7 +25,6 @@ class PamlParser:
         depth = 0
         for line in lines:
             line = line.rstrip()
-            #print('New line: [%s]', type(line), line)
             if not line:
                 continue
             this_depth, line = indent_level(line)
@@ -125,10 +105,8 @@ class PamlParser:
 
         node = PamlLineParser(header).parse()
         if children:
-            #print(f'Adding children to node {node}: {children}')
             node.add_all(children)
         return node
-
 
 def template_from_text(text, desc='template'):
     lines = text.split('\n')
@@ -142,15 +120,3 @@ def template_from_text(text, desc='template'):
     code = utils.compile_string(generator.output, desc)
     logging.debug("code: %s", code)
     return code
-
-def template_f_from_text(text, desc='template'):
-    logging.debug('template_f from text %s', text)
-    code = template_from_text(text, desc)
-    logging.debug('code: %s', code)
-    def render(globs={}, locs={}):
-        return utils.exec_prog_output(code, globs, locs)
-    return render
-    
-def template_f_from_path(path):
-    text = utils.read_file(path)
-    return template_f_from_text(text, path)

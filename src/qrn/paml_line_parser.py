@@ -2,16 +2,6 @@ import re
 import logging
 import qrn.paml_node as paml_node
 
-#
-# What are we parsing?
-#
-# %eltype.class1.class2#id{attrs}=
-#
-# eltype defaults to div
-# classes defualt to no classes
-# id defaults to no id
-# attrs defaults to no attrs
-
 class PamlLineParser:
     def __init__(self, text):
         #print(f'txt: {text}')
@@ -41,7 +31,6 @@ class PamlLineParser:
     def get_word(self):
         result = ''
         ch = self.getc()
-        #print(f'ch: {ch}')
         while ch and re.match(r'[\w\-]', ch):
             result += ch
             ch = self.getc()
@@ -110,6 +99,8 @@ class PamlLineParser:
                 elid = self.get_word()
             elif ch == '{':
                 attrs = eval(self.get_attrs())
+                if not isinstance(attrs, dict):
+                    raise(Exception(f'Does not eval to a dictionary: {attrs}'))
             elif ch == '=':
                 eval_text = True
                 break

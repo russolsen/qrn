@@ -1,20 +1,39 @@
-import sys
-import re
-import glob
+import datetime
+import email.utils
 import fnmatch
+import glob
+import logging
 import os
 import os.path
-import yaml
 import pprint
+import re
 import subprocess
-import logging
-from functools import partial
+import sys
+import time
+import yaml
 from pathlib import Path
 from io import StringIO
 from contextlib import redirect_stdout
 
 PPrinter = pprint.PrettyPrinter(indent=4)
 pp = PPrinter.pprint
+
+class Special:
+    """Special unique values."""
+
+    def __init__(self, tag):
+        self.tag = tag
+
+    def __str__(self):
+        return f'Special({self.tag})'
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return False
+        return self.tag == other.tag
+
+    def __hash__(self):
+        return hash(self.tag)
 
 MarkerRE = r'^--- *$'
 
@@ -64,11 +83,8 @@ def read_yaml(path):
         return yaml.safe_load(text)
     return {}
 
-def write_yaml(data, path):
-    with open(path, 'w') as f:
-        yaml.dump(data, f)
-
 def read_header(path):
+    """Read the header of a file."""
     logging.debug('Read header: %s', path)
     text = __read_header_text(path)
     if text:
@@ -76,6 +92,8 @@ def read_header(path):
     return {}
 
 def read_body(path):
+    """Given a path, read the body (i.e. w/o the header) of the file.
+    Will return the entire file if there is no header."""
     with open(path) as f:
         if __has_header(f):
             __read_until_match(f, MarkerRE)
@@ -83,27 +101,14 @@ def read_body(path):
         result = f.read()
         return result
 
-def xglob(directory, pat):
-    cwd = os.getcwd()
-    os.chdir(directory)
-    result = glob.glob(pat, recursive=True)
-    os.chdir(cwd)
-    return result
-
-def find_paths(pat, skip=True):
-    matches = glob.glob(pat, recursive=True)
-    if skip:
-        matches = filter(
-                lambda path: not re.search('/_', path),
-                matches)
-    return emap(Path, matches)
-
 def match_pat(pat, include_all=False):
-        spaths = glob.glob(pat)
-        if include_all:
-            return [Path(p) for p in spaths]
-        paths = [Path(p) for p in spaths if not re.search('/_', p)]
-        return paths
+    """Given a glob pat, return matching files. If include_all is False,
+    skip files that start with _."""
+    spaths = glob.glob(pat, recursive=True)
+    if include_all:
+        return [Path(p) for p in spaths]
+    paths = [Path(p) for p in spaths if not re.search('/_', p)]
+    return paths
 
 def match_pats(*pats, include_all=False):
     results = []
@@ -112,29 +117,17 @@ def match_pats(*pats, include_all=False):
     return results
 
 def relocate(path, new_dir, suffix=None):
-    new_dirs = Path(new_dir).parts
+    """Given a path and a directory, replace the leading dir of the path
+    with the new_dir. If a suffix is given, also replace the suffix."""
     parts = list(path.parts)
-    parts[0:len(new_dirs)] = new_dirs
-    result = Path(*parts)
+    wo_dir = parts[1:]
+    result = Path(new_dir, *wo_dir)
     if suffix:
         result = result.with_suffix(suffix)
     return result
 
-def globs(globs, fn):
-    for g in globs:
-        if fnmatch.fnmatch(fn, g):
-            return True
-    return False
-
-
-def mk_dirs(directory, *paths):
-    os.makedirs(directory, exist_ok=True)
-    for path in paths:
-        d = f'{directory}/{path}'
-        logging.info('Making dir %s', d)
-        os.makedirs(d, exist_ok=True)
-
 def newer(path1, path2):
+    """Return true if path1 is newer than path2."""
     try:
         p1_mod = os.path.getmtime(path1)
     except FileNotFoundError:
@@ -145,18 +138,11 @@ def newer(path1, path2):
     except FileNotFoundError:
         return True
 
-    return p1_mod > p2_mod
-
-def is_file(directory, path):
-    path = f'{directory}/{path}'
-    return os.path.isfile(path)
-
-def directories(paths):
-    dirs = filter(identity, map(os.path.dirname, paths))
-    return sorted(set(dirs))
-
+    result = p1_mod > p2_mod
+    return result
 
 def always(v):
+    """Return a function that always returns v."""
     def _always(*args):
         return v
     return _always
@@ -173,7 +159,6 @@ def memoize(f):
         return result
     return standin
 
-
 def log_code(code_str):
     """Given code in a string, log it out line by line."""
     logging.debug('---- Code ----')
@@ -181,11 +166,15 @@ def log_code(code_str):
     for i in range(len(lines)):
         logging.debug('%d: %s', i+1, lines[i])
 
+def format_rfc822(dtime):
+    logging.info("datetime: %s", dtime)
+    return email.utils.formatdate(time.mktime(dtime.timetuple()))
+
+def format_now():
+    return format_rfc822(datetime.datetime.now())
+
 def compile_string(s, desc):
-    logging.debug('compile string [[%s]]', s)
-    logging.debug('compile desc [[%s]]', desc)
     result = compile(s, desc, "exec")
-    logging.debug('compile string result %s', result)
     return result
 
 def exec_prog_output(compiled, glob={}, loc={}):
@@ -206,4 +195,3 @@ def exec_string_output(s, glob={}, loc={}, desc="Dynamically generated"):
     """Execute the string supplied as code, returning it's stdout contents."""
     compiled = compile_string(s)
     return exec_prog_output(compiled, glob, loc, desc)
-

@@ -3,6 +3,9 @@ import logging
 import qrn.paml_node as paml_node
 
 class PamlLineParser:
+    BR = re.compile('^ *\{')
+    ACE = re.compile('\} *$')
+
     def __init__(self, text):
         #print(f'txt: {text}')
         self.text = text
@@ -42,11 +45,9 @@ class PamlLineParser:
     def get_attrs(self):
         result = '{'
         ch = self.getc()
-        #print(f'ch: {ch}')
         while ch and ch != '}':
             result += ch
             ch = self.getc()
-            #print(f'ch: {ch}')
         if ch != '}':
             print(f"Error: unclosed brace in {result}")
         result += ch
@@ -60,6 +61,8 @@ class PamlLineParser:
             return self.parse_expression()
         elif ch in ['%', '.', '#']:
             return self.parse_element()
+        elif ch == '/':
+            return self.parse_comment()
         else:
             return self.parse_content()
 
@@ -71,6 +74,11 @@ class PamlLineParser:
         self.getc()
         text = self.remaining().strip()
         return paml_node.CommandNode(text)
+
+    def parse_comment(self):
+        self.getc()
+        text = self.remaining().strip()
+        return paml_node.CommentNode(text)
 
     def parse_expression(self):
         self.getc()

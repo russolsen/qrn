@@ -60,37 +60,31 @@ class ElementNode(PamlNode):
         self._expand_attrs(generator)
 
         if (not self.children) and (not self.text):
-            generator.text('/>\n')
+            generator.text('/>')
         elif self.text and (not self.children):
             generator.text('>')
             self.expand_text(generator)
-            generator.text(f'</{self.tag}>\n')
+            generator.text(f'</{self.tag}>')
         else:
-            generator.text('>\n')
+            generator.text('>')
             self.expand_text(generator)
             self._expand_children(generator)
-            generator.text(f'</{self.tag}>\n')
+            generator.text(f'</{self.tag}>')
             
     def __repr__(self):
         return f'<<Node: tag {self.tag} text [{self.text}] #kids {len(self.children)}>>'
 
-class ContentNode:
+class ContentNode(PamlNode):
     def __init__(self, text):
         logging.debug("New content node: %s", text)
+        super().__init__()
         self.text = text
 
     def expand(self, generator):
-        generator.text(self.text)
-
-    def add_child(self, kid):
-        logging.debug("Add child: %s", kid)
-        s = f'Cannot add children to {self}.'
-        raise Exception(s)
-
-    def add_all(self, kids):
-        logging.debug("Add all: %s", kids)
-        s = f'Cannot add children to {self}.'
-        raise Exception(s)
+        if self.text:
+            generator.text(self.text)
+            generator.text('\n')
+        self._expand_children(generator)
 
     def __repr__(self):
         return f'<<ContentNode: {self.text}>>'
@@ -107,6 +101,19 @@ class ExpressionNode(PamlNode):
         logging.debug("Compile: %s", self.text)
         generator.expr(self.text)
         self._expand_children(generator)
+
+class CommentNode(PamlNode):
+    def __init__(self, text):
+        logging.debug("New comment node: %s", text)
+        super().__init__()
+        self.text = text
+
+    def expand(self, generator):
+        logging.debug("Compile comment: %s", self.text)
+        generator.text('<!-- ')
+        generator.text(self.text)
+        self._expand_children(generator)
+        generator.text(' -->\n')
 
 class CommandNode(PamlNode):
     def __init__(self, text):

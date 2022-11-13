@@ -3,7 +3,7 @@ SITE_SCRIPT=site.py
 #PYTHON=python
 PYTHON=pypy3
 DST_DIR=output
-PORT=7717
+PORT=7720
 
 #export PYTHONPATH=.:bin
 

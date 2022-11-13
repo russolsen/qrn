@@ -42,6 +42,14 @@ class Helpers:
         all_articles = site['articles']
         return self.__filter_pages(all_articles, n)
 
+    def sort_by(self, articles, fieldname, default=None, reverse=False):
+        result = articles.copy()
+        result.sort(
+                key=lambda a: a.get(fieldname, default),
+                reverse=reverse)
+        logging.debug("sorted by %s: %s", fieldname, result)
+        return result
+
     def anchor_for_page(self, page, text=None):
         url = page['url']
         if not text:
@@ -53,6 +61,14 @@ class Helpers:
         all_pages = site['all_pages']
         return next((p for p in all_pages if p.get('id', None) ==  identifier), None)
 
+    def find_page(self, name, value):
+        site = self.page['site']
+        all_pages = site['all_pages']
+        for p in all_pages:
+            if p.get(name, None) == value:
+                return p
+        return None
+        
     def anchor_for_id(self, ident, text=None):
         page = self.find_page_by_id(ident)
         if not page:
@@ -67,10 +83,18 @@ class Helpers:
             raise Exception(f'Page not found: {ident}')
         return page['url']
 
+    def include_relative(self, path):
+        directory = self.path.parent
+        real_path = Path(directory, path)
+        return self.include(real_path, full_path=True)
+
     def add_locals(self, env):
         env['include'] = self.include
+        env['include_relative'] = self.include_relative
         env['related'] = self.related
         env['articles'] = self.articles
+        env['find_page'] = self.find_page
+        env['sort_by'] = self.sort_by
         env['anchor_for_page'] = self.anchor_for_page
         env['anchor_for_id'] = self.anchor_for_id
         env['url_for_id'] = self.url_for_id
@@ -94,8 +118,10 @@ class Expander(Helpers):
 
     def expand(self):
         if self.page.get('layout', None):
+            logging.debug('Page %s, applying layout %s', self.path, self.page['layout'])
             return self.include(self.page['layout'])
         else:
+            logging.debug('No layout for page %s.', self.path)
             body = utils.read_body(self.path)
             return self.__do_expand(self.path, body, self.page)
 

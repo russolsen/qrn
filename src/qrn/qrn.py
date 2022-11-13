@@ -92,6 +92,9 @@ EARLY = datetime.date(2004,1,1)
 def sort_by_date(pages):
     pages.sort(key=lambda p: p.get('date', EARLY), reverse=True)
 
+def sort_by(pages, fieldname, default=None, reverse=False):
+    return pages.sort(key=lambda p: p.get(fieldname, default), reverse=reverse)
+
 def build_indices(output_dir='build'):
     """Compute the category and url indices."""
     by_url = {}
@@ -133,11 +136,12 @@ def build_indices(output_dir='build'):
     paths = utils.match_pats('src/*', 'src/**/*')
     pl.build_all([rule, [utils.always(pl.COMPLETE)]], paths)
 
-    sort_by_date(all_pages)
+    sort_by(all_pages, 'date', EARLY, True)
     articles = list(filter(lambda p: p.get('kind', '') == 'article', all_pages))
 
     for category in by_category:
-        sort_by_date(by_category[category])
+        #sort_by_date(by_category[category])
+        sort_by(by_category[category], 'date', EARLY, True)
 
     return {'all_pages': all_pages,
             'articles': articles,

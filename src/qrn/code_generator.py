@@ -32,11 +32,17 @@ class CodeGenerator:
     def emit_indent(self):
         self._write(' '*(self.depth*2))
 
-    def text(self, text):
+    def text(self, text, line_no=None):
+        if line_no:
+            self.emit_indent()
+            self._write(f'line_no={line_no}')
         self.emit_indent()
         self._write('print(', repr(text), ', end="")\n')
 
-    def expr(self, expr):
+    def expr(self, expr, line_no=None):
+        if line_no:
+            self.emit_indent()
+            self._write(f'line_no={line_no}')
         self.emit_indent()
         self._write('print(', expr, ', end="")\n')
 

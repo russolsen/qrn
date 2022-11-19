@@ -46,9 +46,6 @@ def source_code_for(ttext):
     return output
 
 def template_from_text(ttext, desc='template'):
-    #fragments = re.split(SplitRE, ttext)
-    #output = _compile_template(fragments)
     output = source_code_for(ttext)
     code = utils.compile_string(output, desc)
     return code
- 

@@ -165,7 +165,7 @@ def build_site(site, output_dir='build'):
             components.isoutdated,
             components.read_attrs,
             components.ispublished,
-            components.print_path_f("Building"),
+            components.print_path_f("Building from HTML"),
             set_url,
             insert_attr_f('attrs', 'site', site),
             build_html,
@@ -178,7 +178,7 @@ def build_site(site, output_dir='build'):
             components.is_suffix_f('.xml'),
             components.to_dependency_f(output_dir),
             components.read_attrs,
-            components.print_path_f("Building"),
+            components.print_path_f("Building from XML"),
             insert_attr_f('attrs', 'site', site),
             set_url,
             build_xml,
@@ -190,7 +190,7 @@ def build_site(site, output_dir='build'):
             components.is_suffix_f('.sass', '.scss'),
             components.to_dependency_f(output_dir, '.css', css_inc_files),
             components.isoutdated,
-            components.print_path_f("Building"),
+            components.print_path_f("Building SA/C/SS"),
             build_css,
             utils.always(pl.COMPLETE)
             ]

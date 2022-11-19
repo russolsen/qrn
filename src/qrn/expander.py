@@ -27,7 +27,6 @@ class Helpers:
         return result
 
     def related(self, n=3):
-        logging.info('related, page: %s', self.page.keys())
         category = self.page.get('category', None)
         if not category:
             return []

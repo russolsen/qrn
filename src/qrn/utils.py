@@ -131,13 +131,16 @@ def newer(path1, path2):
     try:
         p1_mod = os.path.getmtime(path1)
     except FileNotFoundError:
+        #logging.info('%s does not exist, False', path1)
         return False
 
     try:
         p2_mod = os.path.getmtime(path2)
     except FileNotFoundError:
+        #logging.info('%s does not exist, True', path2)
         return True
 
+    #logging.info('newer %s %s: %s > %s (%s)', path1, path2, p1_mod, p2_mod, p1_mod > p2_mod)
     result = p1_mod > p2_mod
     return result
 
@@ -167,7 +170,6 @@ def log_code(code_str):
         logging.debug('%d: %s', i+1, lines[i])
 
 def format_rfc822(dtime):
-    logging.info("datetime: %s", dtime)
     return email.utils.formatdate(time.mktime(dtime.timetuple()))
 
 def format_now():

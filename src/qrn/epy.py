@@ -9,6 +9,8 @@ from qrn.code_generator import CodeGenerator
 SplitRE = r'(?=<%)|=%>\n?|!%>\n?|%>'
 
 CODE_RE = re.compile(r'^<%')
+ESCAPE_RE = re.compile(r'^<%%')
+END_ESCAPE = re.compile(r'^%%>')
 END_RE = re.compile(r'^<%! *end *$')
 ELSE_RE = re.compile(r'^<%! *else: *$')
 ELIF_RE = re.compile(r'^<%! *elif .*:')
@@ -20,6 +22,13 @@ def _compile_template(fragments):
     for frag in fragments:
         if not CODE_RE.search(frag):
             generator.text(frag)
+        elif ESCAPE_RE.search(frag):
+            logging.debug('escape: %s', frag)
+            generator.text('<%')
+            generator.text(frag[3:])
+        elif END_ESCAPE.search(frag):
+            logging.debug('end escape: %s', frag)
+            generator.text('%>')
         elif END_RE.search(frag):
             generator.dedent()
         elif ELSE_RE.search(frag) or ELIF_RE.search(frag):

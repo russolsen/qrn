@@ -41,8 +41,8 @@ class Helpers:
         all_articles = site['articles']
         return self.__filter_pages(all_articles, n)
 
-    def sort_by(self, articles, fieldname, default=None, reverse=False):
-        result = articles.copy()
+    def sort_by(self, alist, fieldname, default=None, reverse=False):
+        result = alist.copy()
         result.sort(
                 key=lambda a: a.get(fieldname, default),
                 reverse=reverse)
@@ -60,14 +60,37 @@ class Helpers:
         all_pages = site['all_pages']
         return next((p for p in all_pages if p.get('id', None) ==  identifier), None)
 
-    def find_page(self, name, value):
+    def find_pages(self, *kvs):
+        if (len(kvs) % 2) == 1:
+            logging.error("Odd number of value: %s", nvs)
+            raise Exception("find_pages: You must supply a value for each attribute.")
         site = self.page['site']
-        all_pages = site['all_pages']
-        for p in all_pages:
-            if p.get(name, None) == value:
-                return p
-        return None
-        
+        pages = site['all_pages']
+        pairs = utils.partition(kvs, 2)
+        for pair in pairs:
+            logging.debug('pair: %s', pair)
+            name = pair[0]
+            value = pair[1]
+            pages = list(filter(lambda page: page.get(name,None) == value, pages))
+            logging.debug("filtered pages: %s", len(pages))
+        return list(pages)
+
+    def find_page(self, *kvs):
+        pages = self.find_pages(*kvs)
+        if pages:
+            return pages[0]
+        return []
+
+    def find_page_url(self, *kvs):
+        page = self.find_page(*kvs)
+        if not page:
+            logging.error("Page not found: attribute %s value %s", name, value)
+            raise Exception(f'Page not found: {value}')
+        return page['url']
+
+    def url_for_id(self, ident):
+        return self.find_page_url('id', ident);
+
     def anchor_for_id(self, ident, text=None):
         page = self.find_page_by_id(ident)
         if not page:
@@ -75,27 +98,23 @@ class Helpers:
             raise Exception(f'Page not found: {ident}')
         return self.anchor_for_page(page, text)
 
-    def url_for_id(self, ident):
-        page = self.find_page_by_id(ident)
-        if not page:
-            logging.error("Page id not found: %s", ident)
-            raise Exception(f'Page not found: {ident}')
-        return page['url']
-
     def include_relative(self, path):
         directory = self.path.parent
         real_path = Path(directory, path)
         return self.include(real_path, full_path=True)
 
     def add_locals(self, env):
+        env['page'] = self.page
         env['include'] = self.include
         env['include_relative'] = self.include_relative
         env['related'] = self.related
         env['articles'] = self.articles
         env['find_page'] = self.find_page
+        env['find_pages'] = self.find_pages
         env['sort_by'] = self.sort_by
         env['anchor_for_page'] = self.anchor_for_page
         env['anchor_for_id'] = self.anchor_for_id
+        env['find_page_url'] = self.find_page_url
         env['url_for_id'] = self.url_for_id
         env['atom_xml'] = self.atom_xml
         env['self'] = self

@@ -63,6 +63,11 @@ class PamlParser:
         self.itoken += 1
         return result
 
+    def peek_tokens(self, n=5):
+        if self.itoken >= len(self.tokens):
+            return []
+        return self.tokens[self.itoken:self.itoken+n]
+
     def peek_token(self):
         if self.itoken >= len(self.tokens):
             return EOF
@@ -91,10 +96,12 @@ class PamlParser:
             logging.debug('eof')
             return None
         elif (header == INDENT):
-            logging.warning('unex outdent')
+            logging.warning('unex indent, next tokens:')
+            logging.warning(self.peek_tokens())
             raise Exception('Unexpected indent')
         elif (header == OUTDENT):
-            logging.warning('unex outdent')
+            logging.warning('unex outdent, next tokens')
+            logging.warning(self.peek_tokens())
             raise Exception('Unexpected outdent')
         
         children = []

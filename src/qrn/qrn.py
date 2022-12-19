@@ -143,17 +143,17 @@ def build_indices(output_dir='build'):
         #sort_by_date(by_category[category])
         sort_by(by_category[category], 'date', EARLY, True)
 
-    return {'all_pages': all_pages,
-            'articles': articles,
-            'by_url': by_url,
-            'by_category': by_category}
+    return utils.EasyDict({
+        'all_pages': all_pages,
+        'articles': articles,
+        'by_url': by_url,
+        'by_category': by_category})
 
 def build_site(site, output_dir='build'):
     """Build the site, source in src result in build."""
     sources = utils.match_pats('src/**/', 'src/*', 'src/**/*')
     html_inc_files = utils.match_pats('src/_layouts/*', include_all=True)
     css_inc_files = utils.match_pats('src/**/_*.scss', 'src/**/_*.css', include_all=True)
-    print(css_inc_files)
 
     logging.debug('Sources: %s', sources)
     logging.debug('HTML INC: %s', html_inc_files)
@@ -214,4 +214,5 @@ def build_site(site, output_dir='build'):
 
     print('build....')
     return pl.build_all(rules, sources)
+
 

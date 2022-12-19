@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 import yaml
+import shutil
 from pathlib import Path
 from io import StringIO
 from contextlib import redirect_stdout
@@ -27,6 +28,9 @@ class Special:
     def __str__(self):
         return f'Special({self.tag})'
 
+    def __repr__(self):
+        return str(self)
+
     def __eq__(self, other):
         if not isinstance(other, type(self)):
             return False
@@ -34,6 +38,23 @@ class Special:
 
     def __hash__(self):
         return hash(self.tag)
+
+class EasyDict(dict):
+    """A dict that supports mydict.key style access."""
+
+    def __init__(self, ivalue=None, **kvs):
+        if ivalue and kvs:
+            super().__init__(kvs)
+            self.update(ivalue)
+        elif ivalue:
+            super().__init__(ivalue)
+        elif kvs:
+            super().__init__(kvs)
+
+
+
+    def __getattr__(self, k):
+        return self[k]
 
 MarkerRE = r'^--- *$'
 
@@ -88,8 +109,8 @@ def read_header(path):
     logging.debug('Read header: %s', path)
     text = __read_header_text(path)
     if text:
-        return yaml.safe_load(text)
-    return {}
+        return EasyDict(yaml.safe_load(text))
+    return EasyDict()
 
 def read_body(path):
     """Given a path, read the body (i.e. w/o the header) of the file.
@@ -143,6 +164,10 @@ def newer(path1, path2):
     #logging.info('newer %s %s: %s > %s (%s)', path1, path2, p1_mod, p2_mod, p1_mod > p2_mod)
     result = p1_mod > p2_mod
     return result
+
+def partition(lst, size=2):
+    for i in range(0, len(lst), size):
+        yield lst[i : i+size]
 
 def always(v):
     """Return a function that always returns v."""

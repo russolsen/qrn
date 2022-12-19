@@ -60,16 +60,16 @@ class ElementNode(PamlNode):
         self._expand_attrs(generator)
 
         if (not self.children) and (not self.text):
-            generator.text('/>')
+            generator.text('/> ')
         elif self.text and (not self.children):
             generator.text('>')
             self.expand_text(generator)
-            generator.text(f'</{self.tag}>')
+            generator.text(f'</{self.tag}> ')
         else:
             generator.text('>')
             self.expand_text(generator)
             self._expand_children(generator)
-            generator.text(f'</{self.tag}>')
+            generator.text(f'</{self.tag}> ')
             
     def __repr__(self):
         return f'<<Node: tag {self.tag} text [{self.text}] #kids {len(self.children)}>>'

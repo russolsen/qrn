@@ -85,6 +85,10 @@ class PamlLineParser:
         text = self.remaining().strip()
         return paml_node.ExpressionNode(text)
 
+    def process_text(self, text):
+        text = re.sub(r'\\(.)', r'\g<1>', text)
+        return text
+
     def parse_element(self):
         eltype = 'div'
         classes = []
@@ -116,6 +120,6 @@ class PamlLineParser:
                 break
             ch = self.getc()
 
-        text = self.remaining().strip()
+        text = self.process_text(self.remaining())
 
         return paml_node.ElementNode(eltype, classes, elid, attrs, eval_text, text)

@@ -1,0 +1,15 @@
+---
+kind: partial
+---
+- this_no = int(self.page.get('number', -1))
+- previous_no = find_page('number', this_no - 1)
+- next_no = find_page('number', this_no + 1)
+.container.footer
+  - if previous_no:
+    .navarrow#previous
+      <
+      = anchor_for_page( previous_no )
+  - if next_no:
+    .navarrow#next
+      = anchor_for_page( next_no )
+      > 

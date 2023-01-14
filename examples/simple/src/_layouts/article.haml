@@ -1,0 +1,21 @@
+---
+kind: layout
+---
+%html
+  = include('_head.haml')
+  %body
+    #header
+      %a{"href": "/"}
+        = self.page.site.title
+    .main
+      %h1#articleTitle
+        = self.page.title
+      #content
+        #authors
+          %a{"href": "https://example.com"}= self.page.author
+          ,
+          = self.page.date
+        #article
+          = include(self.path, full_path=True)
+        #footer
+          = include('_footer.haml')

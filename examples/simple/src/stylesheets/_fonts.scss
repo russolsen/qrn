@@ -1,0 +1,19 @@
+@mixin sans {
+  font-family: "logo-display-1", "logo-display-2","Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Geneva, Verdana, sans-serif;
+  line-height: 1.2em;
+}
+
+@mixin serif {
+  font-family: "kulturista-web-1", "kulturista-web-2", Georgia, Cambria, "Times New Roman", Times, serif;
+  line-height: 1.5em;
+}
+
+@mixin logo-font {
+  font-family: baskerville, palatino, "palatino linotype", georgia, serif;
+  line-height: 1.2em;
+}
+
+@mixin monospace {
+  font-family: 'anonymous-pro-1', 'anonymous-pro-2',Monaco, Consolas, "Lucida Console", "Courier New", Courier, monospace;
+  line-height: 1.2em;
+}

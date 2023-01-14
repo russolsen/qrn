@@ -1,0 +1,22 @@
+---
+kind: layout
+---
+%html
+  = include('_head.haml')
+  %body
+    .container.page
+      .row
+        .twelve.columns.header
+          = include('_masthead.haml')
+      .row
+        .row
+          .twelve.columns.left.main
+            %h2= self.page.title
+            %h3
+              By
+              = self.page.author
+            .text
+              = include(self.path, full_path=True)
+        .row
+          .twelve.columns.left.footer
+            = include('_footer.haml')

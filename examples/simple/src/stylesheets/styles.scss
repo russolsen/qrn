@@ -1,0 +1,45 @@
+.main {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 800px;
+}
+
+#articleTitle {
+    font-size: 48px;
+    line-height: 60px;
+    max-width: 950px;
+    margin: 5px auto 20px;
+}
+
+#header {
+  text-align: left;
+  a {
+    text-decoration: none;
+  }
+}
+
+body {
+    background-color: #f8fcff;
+    color: #034ba2;
+    font-size: 18px;
+    line-height: 190%;
+    font-family: -apple-system,BlinkMacSystemFont,Garamond,Futura,Calibri,sans-serif;
+}
+
+.footer {
+  width: 98%;
+}
+
+.navarrow {
+  display: inline;
+}
+
+#previous {
+  text-align: left;
+  float: left;
+}
+
+#next {
+  text-align: right;
+  float: right;
+}

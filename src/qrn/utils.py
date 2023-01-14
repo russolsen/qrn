@@ -51,8 +51,6 @@ class EasyDict(dict):
         elif kvs:
             super().__init__(kvs)
 
-
-
     def __getattr__(self, k):
         return self[k]
 
@@ -79,19 +77,22 @@ def __read_until_match(f, regex):
         line = f.readline()
     return None
 
+def __read_header_text_f(f):
+    result = ''
+    if not __has_header(f):
+        return result
+    f.readline()
+    line = f.readline()
+    while line:
+        if re.search(MarkerRE, line):
+            return result
+        result += line
+        line = f.readline()
+    return result
+
 def __read_header_text(path):
     with open(path) as f:
-        if not __has_header(f):
-            return ''
-        result = ''
-        f.readline()
-        line = f.readline()
-        while line:
-            if re.search(MarkerRE, line):
-                return result
-            result += line
-            line = f.readline()
-    return result
+        return __read_header_text_f(f)
 
 def __has_header(f):
     line = f.readline()
@@ -104,13 +105,18 @@ def read_yaml(path):
         return yaml.safe_load(text)
     return {}
 
-def read_header(path):
+def read_header_f(f):
     """Read the header of a file."""
-    logging.debug('Read header: %s', path)
-    text = __read_header_text(path)
+    text = __read_header_text_f(f)
     if text:
         return EasyDict(yaml.safe_load(text))
     return EasyDict()
+
+def read_header(path):
+    """Read the header of a file."""
+    logging.debug('Read header: %s', path)
+    with open(path) as f:
+        return read_header_f(f)
 
 def read_body(path):
     """Given a path, read the body (i.e. w/o the header) of the file.
@@ -121,6 +127,25 @@ def read_body(path):
             __read_until_match(f, MarkerRE)
         result = f.read()
         return result
+
+def read_structured(path):
+    """Given a path, read the header and the text of the file.
+    Returns header, body."""
+    with open(path) as f:
+        header = read_header_f(f)
+        body = f.read()
+        return header, body
+
+def write_structured(header, body, path):
+    with open(path, 'w') as f:
+        write_structured_f(header,body, f)
+
+def write_structured_f(header, body, f):
+    if header:
+        f.write("---\n")
+        yaml.dump(dict(header), f)
+        f.write("---\n")
+    f.write(body)
 
 def match_pat(pat, include_all=False):
     """Given a glob pat, return matching files. If include_all is False,

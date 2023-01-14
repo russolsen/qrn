@@ -190,7 +190,7 @@ def build_site(site, output_dir='build'):
             components.is_suffix_f('.sass', '.scss'),
             components.to_dependency_f(output_dir, '.css', css_inc_files),
             components.isoutdated,
-            components.print_path_f("Building SA/C/SS"),
+            components.print_path_f("Building SASS/SCSS"),
             build_css,
             utils.always(pl.COMPLETE)
             ]

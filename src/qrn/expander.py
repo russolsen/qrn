@@ -84,8 +84,8 @@ class Helpers:
     def find_page_url(self, *kvs):
         page = self.find_page(*kvs)
         if not page:
-            logging.error("Page not found: attribute %s value %s", name, value)
-            raise Exception(f'Page not found: {value}')
+            logging.error("Page not found: %s", kvs)
+            raise Exception(f'Page not found: {kvs}')
         return page['url']
 
     def url_for_id(self, ident):
@@ -130,8 +130,7 @@ class Expander(Helpers):
     def include(self, path, full_path=False):
         if not full_path:
             path = Path(self.inc_dir, path)
-        page = utils.read_header(path)
-        body = utils.read_body(path)
+        page, body = utils.read_structured(path)
         return self.__do_expand(path, body, page) 
 
     def expand(self):

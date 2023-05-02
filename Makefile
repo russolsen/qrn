@@ -1,24 +1,15 @@
 
-SITE_SCRIPT=site.py
-#PYTHON=python
 PYTHON=pypy3
-DST_DIR=output
-PORT=7720
+DST_DIR=dist
 
-#export PYTHONPATH=.:bin
+build: $(DST_DIR)
+	$(PYTHON) -m build
 
-build:
-	$(PYTHON) $(SITE_SCRIPT)
+$(DST_DIR):
+	mkdir -f $@
 
-serve:
-	$(PYTHON) -m http.server --directory $(DST_DIR) $(PORT)
-
-install-local:
-	$(PYTHON) -m pip install -e .
-
-clean-styles:
-	rm -rf $(DST_DIR)/stylesheets
+install_local:
+	 $(PYTHON) -m pip install .
 
 clean:
 	rm -rf $(DST_DIR)/*
-	rm -f site.log

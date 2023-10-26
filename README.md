@@ -37,9 +37,10 @@ it does the copying:
 
 * QRN knows how to tranform markdown files into html.
 * QRN knows how to do "include" processing on your content so 
-common headers and footers
+that you can write the common parts of your site once.
+
 The key idea behind QRN is that it is extremely opinionated about a few
-things -- mostly around a some key file naming conventions and how those
+things -- mostly around a some key naming conventions and how those
 files are processed into your final static webstite.
 
 Specifically: 
@@ -51,7 +52,7 @@ Specifically:
 * QRN will run all files with a `.html` or `.xml` extension through the `epy` processor (see below).
 * QRN will run all files with a `.haml` extension through the `paml` processor (see below).
 * QRN will run all files with a `.md` extension through the `epy` processor and then convert it to HTML. 
-* QRN will run all files with a `.sass` or `.scss` extension throug the `sass` processor.
+* QRN will run all files with a `.sass` or `.scss` extension through the `sass` processor.
 * Otherwise, QRN will just copy files from `src` to `build`.
 
 ## File headers and layouts.
@@ -108,3 +109,22 @@ Note that the `<%! end %>` does not appear in the actual Python code. It
 is just a marker that the `if` or `for` has ended.
 
 ## The Paml Processor
+
+Similarly, QRN includes a "Paml" processor. Paml is like Haml, but it uses Python
+in place of Ruby. Other than that syntax is more or less Haml. Here's an example:
+
+```
+---
+kind: partial
+---
+.twelve.columns
+  %ul.menu
+    %li.menu
+      %a{"href": "/index.html"} Contents
+     %li.menu
+      %a{"href": "/credit.html"} Credits
+    %li.menu
+      %a{"href": "/license.html"} License
+    %li.menu
+      %a{"href": "/205-0.txt"} Original File
+```

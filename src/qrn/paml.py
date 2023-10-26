@@ -1,3 +1,5 @@
+'''Like HAML, but with Python.'''
+
 import re
 import logging
 import qrn.utils as utils
@@ -16,6 +18,7 @@ def indent_level(s):
             return [n / SPACING, s[n:]]
 
 class PamlParser:
+    '''Parse the HAML-like Paml text.'''
     def __init__(self, lines):
         self.tokens = []
         self.tokenize_lines(lines)
@@ -116,6 +119,7 @@ class PamlParser:
         return node
 
 def template_from_text(text, desc='template'):
+    '''Return the Python compiled code for the Paml text.'''
     lines = text.split('\n')
     parser = PamlParser(lines)
     generator = CodeGenerator()

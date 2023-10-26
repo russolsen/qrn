@@ -2,6 +2,7 @@ import re
 import logging
 
 class PamlNode:
+    '''Generic Paml parse tree node.'''
     def __init__(self):
         self.children = []
 
@@ -23,6 +24,7 @@ class PamlNode:
 
 
 class ElementNode(PamlNode):
+    '''Node that represents a Paml HTML element.'''
     def __init__(self, tag, classes, elid, attrs, eval_text, text):
         super().__init__()
         self.tag = tag
@@ -75,6 +77,7 @@ class ElementNode(PamlNode):
         return f'<<Node: tag {self.tag} text [{self.text}] #kids {len(self.children)}>>'
 
 class ContentNode(PamlNode):
+    '''Paml node that represents some text.'''
     def __init__(self, text):
         logging.debug("New content node: %s", text)
         super().__init__()
@@ -92,6 +95,8 @@ class ContentNode(PamlNode):
 START_RE = re.compile(r'.*:$')
 
 class ExpressionNode(PamlNode):
+    '''A Python expression embedded in some paml.'''
+
     def __init__(self, text):
         logging.debug("New expr node: %s", text)
         super().__init__()
@@ -103,6 +108,8 @@ class ExpressionNode(PamlNode):
         self._expand_children(generator)
 
 class CommentNode(PamlNode):
+    '''A Paml comment.'''
+
     def __init__(self, text):
         logging.debug("New comment node: %s", text)
         super().__init__()
@@ -116,6 +123,8 @@ class CommentNode(PamlNode):
         generator.text(' -->\n')
 
 class CommandNode(PamlNode):
+    '''A Paml node for some arbitrary Python code.'''
+
     def __init__(self, text):
         logging.debug("New command node: %s", text)
         super().__init__()

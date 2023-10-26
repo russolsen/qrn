@@ -1,3 +1,5 @@
+'''Embedded PYthon: Templating via Python.'''
+
 import re
 import sys
 from io import StringIO
@@ -50,11 +52,13 @@ def _compile_template(fragments):
     return generator.output
 
 def source_code_for(ttext):
+    '''Given some template text, return the corresponding Python code.'''
     fragments = re.split(SplitRE, ttext)
     output = _compile_template(fragments)
     return output
 
 def template_from_text(ttext, desc='template'):
+    '''Given some template text, return the corresponding compiled Python code.'''
     output = source_code_for(ttext)
     code = utils.compile_string(output, desc)
     return code

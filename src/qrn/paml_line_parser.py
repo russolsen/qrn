@@ -3,11 +3,12 @@ import logging
 import qrn.paml_node as paml_node
 
 class PamlLineParser:
+    '''Parse a single line of Paml into nodes.'''
+
     BR = re.compile('^ *\{')
     ACE = re.compile('\} *$')
 
     def __init__(self, text):
-        #print(f'txt: {text}')
         self.text = text
         self.ichar = 0
 
@@ -37,9 +38,7 @@ class PamlLineParser:
         while ch and re.match(r'[\w\-]', ch):
             result += ch
             ch = self.getc()
-            #print(f'ch: {ch}')
         self.backup()
-        #print(f'get word returning {result}')
         return result
 
     def get_attrs(self):

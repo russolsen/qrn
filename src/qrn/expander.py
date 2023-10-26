@@ -1,3 +1,5 @@
+'''Key code of QRN, takes a file and expands it to output.'''
+
 import logging
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -8,6 +10,8 @@ import qrn.converters as converters
 import qrn.rss as rss
 
 class Helpers:
+    '''Helper functions for expanding QRN files.'''
+
     def __filter_pages(self, pages, n):
         url = self.page['url']
         candidates = pages[:n+1]
@@ -128,12 +132,14 @@ class Expander(Helpers):
         self.page = page
      
     def include(self, path, full_path=False):
+        '''Process a file include.'''
         if not full_path:
             path = Path(self.inc_dir, path)
         page, body = utils.read_structured(path)
         return self.__do_expand(path, body, page) 
 
     def expand(self):
+        '''Expand a single page, dealing with the layout if any.'''
         if self.page.get('layout', None):
             logging.debug('Page %s, applying layout %s', self.path, self.page['layout'])
             return self.include(self.page['layout'])

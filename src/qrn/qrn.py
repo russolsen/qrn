@@ -52,13 +52,6 @@ def set_url(context):
     attrs['url'] = '/' + str(Path(*opath.parts[1:]))
     return context
 
-#def insert_attr_f(name, value):
-#    """Insert an attribute into the attrs dictionary in the context."""
-#    def insert_attr(context):
-#        context['attrs'][name] = value
-#        return context
-#    return insert_attr
-
 def insert_attr_f(*args):
     """Insert an attribute into the attrs dictionary in the context."""
     extra_keys = args[:-2]
@@ -214,5 +207,3 @@ def build_site(site, output_dir='build'):
 
     print('build....')
     return pl.build_all(rules, sources)
-
-

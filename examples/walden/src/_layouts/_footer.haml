@@ -6,21 +6,21 @@ kind: partial
 - next_ch = find_page('chapter', this_ch + 1)
 .container.footer
   .row
-    %h5 Previous
-      - if previous_ch:
-        = anchor_for_page( previous_ch )
+    Previous
+    - if previous_ch:
+      = anchor_for_page( previous_ch )
   .row
-    %h5 Next
+    Next
       - if next_ch:
         = anchor_for_page( next_ch )
   .row
-    %h5 Related
+    Related
     %ul.related
       - for p in related(6):
         %li.related_page
           = anchor_for_page(p)
   .row
-    %h5 Recent
+    Recent
     %ul.recent
       - for p in articles(6):
         %li.recent_page

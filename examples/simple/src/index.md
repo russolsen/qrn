@@ -39,7 +39,7 @@ Published on <%= p['date'] %>
 <%! end %>
 
 The `articles` function doesn't promise to return the articles in
-any given order, but bot can certainly sort your 
+any given order, but you can sort your 
 articles anyway you like. For example from newest to oldest.
 
 <%! for p in sort_by(articles(), 'date'): %>
@@ -70,7 +70,6 @@ all of the articles by a particular author:
 <%! for p in find_pages('kind', 'article', 'author', 'Russ Olsen'): %>
  * [<%= p['title']%>](<%= p['url'] %>)
 <%! end %>
-
 
 
 ## Linking to Specfic articles
